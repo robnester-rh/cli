@@ -49,6 +49,7 @@ import (
 	"github.com/enterprise-contract/ec-cli/internal/policy"
 	"github.com/enterprise-contract/ec-cli/internal/policy/source"
 	"github.com/enterprise-contract/ec-cli/internal/utils"
+	"github.com/enterprise-contract/go-gather/metadata"
 )
 
 type mockTestRunner struct {
@@ -69,6 +70,10 @@ type testPolicySource struct{}
 
 func (t testPolicySource) GetPolicy(ctx context.Context, dest string, showMsg bool) (string, error) {
 	return "/policy", nil
+}
+
+func (t testPolicySource) GetPolicyWithMetadata(ctx context.Context, dest string, showMsg bool) (string, metadata.Metadata, error) {
+	return "/policy", nil, nil
 }
 
 func (t testPolicySource) PolicyUrl() string {

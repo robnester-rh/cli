@@ -33,6 +33,7 @@ import (
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"github.com/enterprise-contract/ec-cli/internal/applicationsnapshot"
+	"github.com/enterprise-contract/ec-cli/internal/cache"
 	"github.com/enterprise-contract/ec-cli/internal/evaluator"
 	"github.com/enterprise-contract/ec-cli/internal/format"
 	"github.com/enterprise-contract/ec-cli/internal/output"
@@ -45,6 +46,8 @@ import (
 type imageValidationFunc func(context.Context, app.SnapshotComponent, *app.SnapshotSpec, policy.Policy, []evaluator.Evaluator, bool) (*output.Output, error)
 
 var newConftestEvaluator = evaluator.NewConftestEvaluator
+
+var policyCache *cache.PolicyCache
 
 func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 	data := struct {
@@ -209,7 +212,7 @@ func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 			}
 			data.policyConfiguration = policyConfiguration
 
-			if p, err := policy.NewPolicy(cmd.Context(), policy.Options{
+			policyOptions := policy.Options{
 				EffectiveTime: data.effectiveTime,
 				Identity: cosign.Identity{
 					Issuer:        data.certificateOIDCIssuer,
@@ -221,9 +224,12 @@ func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 				PolicyRef:   data.policyConfiguration,
 				PublicKey:   data.publicKey,
 				RekorURL:    data.rekorURL,
-			}); err != nil {
+			}
+
+			if p, cache, err := validate_utils.PreProcessPolicy(ctx, policyOptions); err != nil {
 				allErrors = multierror.Append(allErrors, err)
 			} else {
+				policyCache = cache
 				// inject extra variables into rule data per source
 				if len(data.extraRuleData) > 0 {
 					policySpec := p.Spec()

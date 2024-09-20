@@ -751,9 +751,9 @@ func Test_ValidateImageErrorLog(t *testing.T) {
 
 	testPolicyJSON := `sources:
   - policy:
-      - "registry/policy:latest"
+      - "oci::registry/policy:latest"
     data:
-      - "registry/policy-data:latest"
+      - "oci::registry/policy-data:latest"
     config:
       include:
         - '@minimal'
