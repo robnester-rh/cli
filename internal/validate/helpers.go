@@ -21,16 +21,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/enterprise-contract/ec-cli/internal/cache"
-	"github.com/enterprise-contract/ec-cli/internal/policy"
-	"github.com/enterprise-contract/ec-cli/internal/policy/source"
-	"github.com/enterprise-contract/ec-cli/internal/utils"
 	"github.com/enterprise-contract/go-gather/metadata"
 	gitMetadata "github.com/enterprise-contract/go-gather/metadata/git"
 	ociMetadata "github.com/enterprise-contract/go-gather/metadata/oci"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"sigs.k8s.io/yaml"
+
+	"github.com/enterprise-contract/ec-cli/internal/cache"
+	"github.com/enterprise-contract/ec-cli/internal/policy"
+	"github.com/enterprise-contract/ec-cli/internal/policy/source"
+	"github.com/enterprise-contract/ec-cli/internal/utils"
 )
 
 // Determine policyConfig
@@ -92,7 +93,7 @@ func ReadFile(ctx context.Context, fileName string) (string, error) {
 // It returns a new policy object that has policy URLs which are pinned along with a cache object.
 func PreProcessPolicy(ctx context.Context, policyOptions policy.Options) (policy.Policy, *cache.PolicyCache, error) {
 	pinnedPolicyUrls := map[string][]string{}
-    cache := cache.NewPolicyCache()
+	cache := cache.NewPolicyCache()
 
 	p, err := policy.NewPolicy(ctx, policyOptions)
 	if err != nil {

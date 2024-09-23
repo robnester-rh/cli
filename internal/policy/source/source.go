@@ -168,7 +168,7 @@ func (p *PolicyUrl) GetPolicyWithMetadata(ctx context.Context, workDir string, s
 	dest := uniqueDestination(workDir, p.Subdir(), sourceUrl)
 	m, err := downloader.Download(ctx, dest, sourceUrl, showMsg)
 	return dest, m, err
-	
+
 	/* // This is the original code
 	dl := func(source string, dest string) (metadata.Metadata, error) {
 		x := ctx.Value(DownloaderFuncKey)

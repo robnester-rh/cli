@@ -36,6 +36,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	ecc "github.com/enterprise-contract/enterprise-contract-controller/api/v1alpha1"
+	"github.com/enterprise-contract/go-gather/metadata"
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/open-policy-agent/opa/ast"
 	"github.com/spf13/afero"
@@ -49,7 +50,6 @@ import (
 	"github.com/enterprise-contract/ec-cli/internal/policy"
 	"github.com/enterprise-contract/ec-cli/internal/policy/source"
 	"github.com/enterprise-contract/ec-cli/internal/utils"
-	"github.com/enterprise-contract/go-gather/metadata"
 )
 
 type mockTestRunner struct {
