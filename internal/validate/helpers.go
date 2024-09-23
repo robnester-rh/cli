@@ -170,19 +170,21 @@ func PreProcessPolicy(ctx context.Context, policyOptions policy.Options) (policy
 		}
 	}
 
-	policyConfigYaml, err := yaml.Marshal(result)
-	if err != nil {
-		return nil, nil, err
-	}
+	if len(result) > 0 {
+		policyConfigYaml, err := yaml.Marshal(result)
+		if err != nil {
+			return nil, nil, err
+		}
 
-	policyOptions.PolicyRef = string(policyConfigYaml)
-	pol, err := policy.NewPolicy(ctx, policyOptions)
-	if err != nil {
-		return nil, nil, err
+		policyOptions.PolicyRef = string(policyConfigYaml)
+		p, err = policy.NewPolicy(ctx, policyOptions)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// TODO: WORK ON CACHE
-	return pol, cache, err
+	return p, cache, err
 }
 
 func getPinnedUrl(u string, m metadata.Metadata) (string, error) {
