@@ -116,7 +116,7 @@ func PreProcessPolicy(ctx context.Context, policyOptions policy.Options) (policy
 		}
 
 		for _, policySource := range policySources {
-			if !strings.HasPrefix(policySource.PolicyUrl(), "data:application/json;base64,") {
+			if !strings.HasPrefix(policySource.PolicyUrl(), "data:") {
 				destDir, metadata, err := policySource.GetPolicyWithMetadata(ctx, dir, false)
 				if err != nil {
 					log.Debugf("Unable to download source from %s!", policySource.PolicyUrl())
