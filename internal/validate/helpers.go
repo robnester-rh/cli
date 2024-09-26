@@ -19,10 +19,19 @@ package validate
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/enterprise-contract/go-gather/metadata"
+	fileMetadata "github.com/enterprise-contract/go-gather/metadata/file"
+	gitMetadata "github.com/enterprise-contract/go-gather/metadata/git"
+	httpMetadata "github.com/enterprise-contract/go-gather/metadata/http"
+	ociMetadata "github.com/enterprise-contract/go-gather/metadata/oci"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"sigs.k8s.io/yaml"
 
+	"github.com/enterprise-contract/ec-cli/internal/cache"
+	"github.com/enterprise-contract/ec-cli/internal/policy"
 	"github.com/enterprise-contract/ec-cli/internal/policy/source"
 	"github.com/enterprise-contract/ec-cli/internal/utils"
 )
@@ -78,4 +87,144 @@ func ReadFile(ctx context.Context, fileName string) (string, error) {
 	}
 	log.Debugf("Loaded %s", fileName)
 	return string(fileBytes), nil
+}
+
+// downloadCache is a concurrent map used to cache downloaded files.
+
+// PreProcessPolicy takes a policy.Options object and pre-loads the cache by downloading the policy.
+// It returns a new policy object that has policy URLs which are pinned along with a cache object.
+func PreProcessPolicy(ctx context.Context, policyOptions policy.Options) (policy.Policy, *cache.PolicyCache, error) {
+	var policyCache *cache.PolicyCache
+	pinnedPolicyUrls := map[string][]string{}
+	policyCache, ok := cache.PolicyCacheFromContext(ctx)
+	if !ok {
+		log.Debugf("No cache in context, creating new one")
+		policyCache = cache.NewPolicyCache()
+	} else {
+		log.Debugf("Cache found in context")
+	}
+
+	p, err := policy.NewPolicy(ctx, policyOptions)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, sourceGroup := range p.Spec().Sources {
+		log.Debugf("Fetching policy source group '%+v'\n", sourceGroup.Name)
+		policySources, err := source.FetchPolicySources(sourceGroup)
+		if err != nil {
+			log.Debugf("Failed to fetch policy source group '%s'!\n", sourceGroup.Name)
+			return nil, nil, err
+		}
+
+		fs := utils.FS(ctx)
+		dir, err := utils.CreateWorkDir(fs)
+		policyCache.Set("workDir", dir, err)
+		if err != nil {
+			log.Debug("Failed to create work dir!")
+			return nil, nil, err
+		}
+
+		for _, policySource := range policySources {
+			if !strings.HasPrefix(policySource.PolicyUrl(), "data:") {
+				destDir, metadata, err := policySource.GetPolicyWithMetadata(ctx, dir, false)
+				if err != nil {
+					log.Debugf("Unable to download source from %s!", policySource.PolicyUrl())
+					return nil, nil, err
+				}
+				log.Debugf("Downloaded policy source from %s to %s\n", policySource.PolicyUrl(), destDir)
+				pinnedURL, err := GetPinnedUrl(policySource.PolicyUrl(), metadata)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				if _, found := policyCache.Get(pinnedURL); !found {
+					log.Debugf("Cache miss for: %s, adding to cache", pinnedURL)
+					policyCache.Set(pinnedURL, destDir, nil)
+					pinnedPolicyUrls[policySource.Subdir()] = append(pinnedPolicyUrls[policySource.Subdir()], pinnedURL)
+					log.Debugf("Added %s to the pinnedPolicyUrls in \"%s\"", pinnedURL, policySource.Subdir())
+				} else {
+					log.Debugf("Cache hit for: %s", pinnedURL)
+				}
+
+			}
+		}
+	}
+
+	policyRef := policyOptions.PolicyRef
+
+	var result map[string]interface{}
+	err = yaml.Unmarshal([]byte(policyRef), &result)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var sources []interface{}
+	if spec, ok := result["spec"].(map[string]interface{}); ok {
+		if s, ok := spec["sources"].([]interface{}); ok {
+			sources = s
+		}
+	}
+	if s, ok := result["sources"].([]interface{}); ok {
+		sources = s
+	}
+
+	for _, source := range sources {
+		sourceMap, ok := source.(map[string]interface{})
+		if !ok {
+			log.Debugf("skipping %+v: source item is not a map", sourceMap)
+			continue
+		}
+
+		if len(pinnedPolicyUrls["policy"]) > 0 {
+			sourceMap["policy"] = pinnedPolicyUrls["policy"]
+		}
+
+		if len(pinnedPolicyUrls["data"]) > 0 {
+			sourceMap["data"] = pinnedPolicyUrls["data"]
+		}
+	}
+	if len(result) > 0 {
+		policyConfigYaml, err := yaml.Marshal(result)
+		if err != nil {
+			return nil, nil, err
+		}
+		policyOptions.PolicyRef = string(policyConfigYaml)
+		p, err = policy.NewPolicy(ctx, policyOptions)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return p, policyCache, err
+}
+
+func GetPinnedUrl(u string, m metadata.Metadata) (string, error) {
+	if m == nil {
+		return "", fmt.Errorf("metadata is nil")
+	}
+
+	if len(u) == 0 {
+		return "", fmt.Errorf("url is empty")
+	}
+
+	switch t := m.(type) {
+	case *gitMetadata.GitMetadata:
+		url := strings.Split(strings.Split(u, "//")[0], "?")[0]
+		path := strings.Split(u, "//")[1]
+		url = fmt.Sprintf("%s?ref=%s", url, t.LatestCommit)
+		if path != "" {
+			url = fmt.Sprintf("%s//%s", url, path)
+		}
+		return url, nil
+	case *ociMetadata.OCIMetadata:
+		url := strings.Split(strings.Split(u, "//")[0], ":")[0]
+		return fmt.Sprintf("%s@%s", url, t.Digest), nil
+	case *httpMetadata.HTTPMetadata:
+		return u, nil
+	case *fileMetadata.FileMetadata:
+		return u, nil
+	default:
+		return "", fmt.Errorf("unknown metadata type")
+	}
 }

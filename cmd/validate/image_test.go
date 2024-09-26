@@ -36,14 +36,18 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/enterprise-contract/ec-cli/internal/applicationsnapshot"
 	"github.com/enterprise-contract/ec-cli/internal/evaluator"
 	"github.com/enterprise-contract/ec-cli/internal/output"
 	"github.com/enterprise-contract/ec-cli/internal/policy"
+	"github.com/enterprise-contract/ec-cli/internal/policy/source"
 	"github.com/enterprise-contract/ec-cli/internal/utils"
 	"github.com/enterprise-contract/ec-cli/internal/utils/oci"
 	"github.com/enterprise-contract/ec-cli/internal/utils/oci/fake"
+	"github.com/enterprise-contract/go-gather/metadata"
+	ociMetadata "github.com/enterprise-contract/go-gather/metadata/oci"
 )
 
 type data struct {
@@ -94,6 +98,16 @@ func happyValidator() imageValidationFunc {
 			ExitCode: 0,
 		}, nil
 	}
+}
+
+type MockDownloader struct {
+	mock.Mock
+}
+
+func (m *MockDownloader) Download(_ context.Context, dest string, sourceUrl string, showMsg bool) (metadata.Metadata, error) {
+	args := m.Called(dest, sourceUrl, showMsg)
+
+	return args.Get(0).(metadata.Metadata), args.Error(1)
 }
 
 func Test_determineInputSpec(t *testing.T) {
@@ -528,6 +542,11 @@ spec:
 			fs := afero.NewMemMapFs()
 			ctx := utils.WithFS(context.Background(), fs)
 			ctx = oci.WithClient(ctx, &client)
+
+			mdl := MockDownloader{}
+			mdl.On("Download", mock.Anything, "quay.io/hacbs-contract/ec-release-policy:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+			ctx = context.WithValue(ctx, source.DownloaderFuncKey, &mdl)
+
 			cmd.SetContext(ctx)
 
 			err := afero.WriteFile(fs, "/policy.yaml", []byte(c.config), 0644)
@@ -568,6 +587,12 @@ func Test_ValidateImageCommandJSONPolicyFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	ctx := utils.WithFS(context.Background(), fs)
 	ctx = oci.WithClient(ctx, &client)
+
+	mdl := MockDownloader{}
+	mdl.On("Download", mock.Anything, "registry/policy:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	mdl.On("Download", mock.Anything, "registry/policy-data:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	ctx = context.WithValue(ctx, source.DownloaderFuncKey, &mdl)
+
 	cmd.SetContext(ctx)
 
 	testPolicyJSON := `sources:
@@ -613,6 +638,11 @@ func Test_ValidateImageCommandExtraData(t *testing.T) {
 	client := fake.FakeClient{}
 	commonMockClient(&client)
 	ctx = oci.WithClient(ctx, &client)
+
+	mdl := MockDownloader{}
+	mdl.On("Download", mock.Anything, "registry/policy:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	mdl.On("Download", mock.Anything, "registry/policy-data:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	ctx = context.WithValue(ctx, source.DownloaderFuncKey, &mdl)
 
 	cmd.SetContext(ctx)
 
@@ -680,10 +710,10 @@ spec:
 	assert.NoError(t, err)
 	assert.JSONEq(t, `{
 		"data": [
-			"registry/policy-data:latest"
+			"registry/policy-data@sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"
 		],
 		"policy": [
-			"registry/policy:latest"
+			"registry/policy@sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"
 		],
 		"ruleData": {
 			"custom_rule_data":{"prefix_data":["registry1"]},
@@ -705,6 +735,12 @@ func Test_ValidateImageCommandEmptyPolicyFile(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	ctx := utils.WithFS(context.Background(), fs)
 	ctx = oci.WithClient(ctx, &client)
+
+	mdl := MockDownloader{}
+	mdl.On("Download", mock.Anything, "registry/policy:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	mdl.On("Download", mock.Anything, "registry/policy-data:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	ctx = context.WithValue(ctx, source.DownloaderFuncKey, &mdl)
+
 	cmd.SetContext(ctx)
 
 	err := afero.WriteFile(fs, "/policy.yaml", []byte(nil), 0644)
@@ -747,13 +783,18 @@ func Test_ValidateImageErrorLog(t *testing.T) {
 	commonMockClient(&client)
 	ctx = oci.WithClient(ctx, &client)
 
+	mdl := MockDownloader{}
+	mdl.On("Download", mock.Anything, "oci::registry/policy:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	mdl.On("Download", mock.Anything, "oci::registry/policy-data:latest", false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	ctx = context.WithValue(ctx, source.DownloaderFuncKey, &mdl)
+
 	cmd.SetContext(ctx)
 
 	testPolicyJSON := `sources:
   - policy:
-      - "registry/policy:latest"
+      - "oci::registry/policy:latest"
     data:
-      - "registry/policy-data:latest"
+      - "oci::registry/policy-data:latest"
     config:
       include:
         - '@minimal'

@@ -37,6 +37,7 @@ import (
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/enterprise-contract/ec-cli/internal/cache"
 	"github.com/enterprise-contract/ec-cli/internal/opa"
 	"github.com/enterprise-contract/ec-cli/internal/opa/rule"
 	"github.com/enterprise-contract/ec-cli/internal/policy"
@@ -294,18 +295,29 @@ func NewConftestEvaluatorWithNamespace(ctx context.Context, policySources []sour
 	}
 
 	c.include, c.exclude = computeIncludeExclude(source, p)
-
-	dir, err := utils.CreateWorkDir(fs)
-	if err != nil {
-		log.Debug("Failed to create work dir!")
-		return nil, err
+	policyCache, ok := cache.PolicyCacheFromContext(ctx)
+	if !ok {
+		log.Debugf("policy cache not found in context")
+		policyCache = cache.NewPolicyCache()
 	}
-	c.workDir = dir
 
+	dir, ok := policyCache.Get("workDir")
+	if !ok {
+		log.Debugf("Cache miss for workDir: %s", dir)
+		d, err := utils.CreateWorkDir(fs)
+		if err != nil {
+			log.Debug("Failed to create work dir!")
+			return nil, err
+		}
+		dir = d
+		log.Debugf("Created work dir %s", dir)
+	} else {
+		log.Debugf("Cache Hit for workDir: %s", dir)
+	}
+
+	c.workDir = dir
 	c.policyDir = filepath.Join(c.workDir, "policy")
 	c.dataDir = filepath.Join(c.workDir, "data")
-
-	log.Debugf("Created work dir %s", dir)
 
 	if err := c.createDataDirectory(ctx); err != nil {
 		return nil, err
@@ -357,6 +369,10 @@ func (r *policyRules) collect(a *ast.AnnotationsRef) error {
 
 func (c conftestEvaluator) Evaluate(ctx context.Context, target EvaluationTarget) ([]Outcome, Data, error) {
 	var results []Outcome
+	policyCache, found := cache.PolicyCacheFromContext(ctx)
+	if !found {
+		policyCache = cache.NewPolicyCache()
+	}
 
 	// hold all rule annotations from all policy sources
 	// NOTE: emphasis on _all rules from all sources_; meaning that if two rules
@@ -365,13 +381,20 @@ func (c conftestEvaluator) Evaluate(ctx context.Context, target EvaluationTarget
 	rules := policyRules{}
 	// Download all sources
 	for _, s := range c.policySources {
-		dir, err := s.GetPolicy(ctx, c.workDir, false)
-		if err != nil {
-			log.Debugf("Unable to download source from %s!", s.PolicyUrl())
-			// TODO do we want to download other policies instead of erroring out?
-			return nil, nil, err
+		var err error
+		dir, ok := policyCache.Get(s.PolicyUrl())
+		if !ok {
+			log.Debugf("Cache miss for: %s", s.PolicyUrl())
+			dir, err = s.GetPolicy(ctx, c.workDir, false)
+			if err != nil {
+				log.Debugf("\nUnable to download source from %s!\nm", s.PolicyUrl())
+				// TODO do we want to download other policies instead of erroring out?
+				return nil, nil, err
+			}
+			log.Debugf("Downloaded %s source to: %s\n\n", s.Subdir(), dir)
+		} else {
+			log.Debugf("Cache Hit for: %s. Policy in \"%s\"", s.PolicyUrl(), dir)
 		}
-
 		annotations := []*ast.AnnotationsRef{}
 		fs := utils.FS(ctx)
 		// We only want to inspect the directory of policy subdirs, not config or data subdirs.

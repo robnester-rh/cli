@@ -36,6 +36,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	ecc "github.com/enterprise-contract/enterprise-contract-controller/api/v1alpha1"
+	"github.com/enterprise-contract/go-gather/metadata"
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/open-policy-agent/opa/ast"
 	"github.com/spf13/afero"
@@ -44,6 +45,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kube-openapi/pkg/util/sets"
 
+	"github.com/enterprise-contract/ec-cli/internal/cache"
 	"github.com/enterprise-contract/ec-cli/internal/downloader"
 	"github.com/enterprise-contract/ec-cli/internal/opa/rule"
 	"github.com/enterprise-contract/ec-cli/internal/policy"
@@ -71,6 +73,10 @@ func (t testPolicySource) GetPolicy(ctx context.Context, dest string, showMsg bo
 	return "/policy", nil
 }
 
+func (t testPolicySource) GetPolicyWithMetadata(ctx context.Context, dest string, showMsg bool) (string, metadata.Metadata, error) {
+	return "/policy", nil, nil
+}
+
 func (t testPolicySource) PolicyUrl() string {
 	return "test-url"
 }
@@ -81,6 +87,20 @@ func (t testPolicySource) Subdir() string {
 
 type mockDownloader struct {
 	mock.Mock
+}
+
+type mockPolicyCache struct {
+	mock.Mock
+}
+
+func (m *mockPolicyCache) Get(key string) (string, bool) {
+	args := m.Called(key)
+
+	return args.String(0), args.Bool(1)
+}
+
+func (m *mockPolicyCache) Set(key, value string, err error) {
+	m.Called(key, value, err)
 }
 
 func (m *mockDownloader) Download(ctx context.Context, dest string, urls []string) error {
@@ -213,6 +233,7 @@ func setupTestContext(r *mockTestRunner, dl *mockDownloader) context.Context {
 	fs := afero.NewMemMapFs()
 	ctx = utils.WithFS(ctx, fs)
 	ctx = withCapabilities(ctx, testCapabilities)
+	ctx = cache.CtxWithPolicyCache(ctx, &cache.PolicyCache{})
 
 	if err := afero.WriteFile(fs, "/policy/example.rego", []byte(heredoc.Doc(`# Simplest always-failing policy
 	package main
