@@ -29,6 +29,7 @@ import (
 
 	ecc "github.com/enterprise-contract/enterprise-contract-controller/api/v1alpha1"
 	"github.com/enterprise-contract/go-gather/metadata"
+	fileMetadata "github.com/enterprise-contract/go-gather/metadata/file"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -49,7 +50,7 @@ type mockDownloader struct {
 func (m *mockDownloader) Download(_ context.Context, dest string, sourceUrl string, showMsg bool) (metadata.Metadata, error) {
 	args := m.Called(dest, sourceUrl, showMsg)
 
-	return nil, args.Error(0)
+	return args.Get(0).(metadata.Metadata), args.Error(1)
 }
 
 func TestGetPolicy(t *testing.T) {
@@ -57,30 +58,34 @@ func TestGetPolicy(t *testing.T) {
 		name      string
 		sourceUrl string
 		dest      string
+		metadata  metadata.Metadata
 		err       error
 	}{
 		{
 			name:      "Gets policies",
 			sourceUrl: "https://example.com/user/foo.git",
 			dest:      "/tmp/ec-work-1234/policy/[0-9a-f]+",
+			metadata:  &fileMetadata.FileMetadata{},
 			err:       nil,
 		},
 		{
 			name:      "Gets policies with getter style source url",
 			sourceUrl: "git::https://example.com/user/foo.git//subdir?ref=devel",
 			dest:      "/tmp/ec-work-1234/policy/[0-9a-f]+",
+			metadata:  &fileMetadata.FileMetadata{},
 			err:       nil,
 		},
 		{
 			name:      "Fails fetching the policy",
 			sourceUrl: "failure",
 			dest:      "/tmp/ec-work-1234/policy/[0-9a-f]+",
+			metadata:  &fileMetadata.FileMetadata{},
 			err:       errors.New("expected"),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			p := PolicyUrl{Url: tt.sourceUrl, Kind: "policy"}
+			p := PolicyUrl{Url: tt.sourceUrl, Kind: PolicyKind}
 
 			dl := mockDownloader{}
 			dl.On("Download", mock.MatchedBy(func(dest string) bool {
@@ -90,7 +95,7 @@ func TestGetPolicy(t *testing.T) {
 				}
 
 				return matched
-			}), tt.sourceUrl, false).Return(tt.err)
+			}), tt.sourceUrl, false).Return(tt.metadata, tt.err)
 
 			_, err := p.GetPolicy(usingDownloader(context.TODO(), &dl), "/tmp/ec-work-1234", false)
 			if tt.err == nil {
@@ -146,12 +151,12 @@ func TestFetchPolicySources(t *testing.T) {
 				Data:   []string{"github.com/org/repo1//data/", "github.com/org/repo2//data/", "github.com/org/repo3//data/"},
 			},
 			expected: []PolicySource{
-				&PolicyUrl{Url: "github.com/org/repo1//policy/", Kind: "policy"},
-				&PolicyUrl{Url: "github.com/org/repo2//policy/", Kind: "policy"},
-				&PolicyUrl{Url: "github.com/org/repo3//policy/", Kind: "policy"},
-				&PolicyUrl{Url: "github.com/org/repo1//data/", Kind: "data"},
-				&PolicyUrl{Url: "github.com/org/repo2//data/", Kind: "data"},
-				&PolicyUrl{Url: "github.com/org/repo3//data/", Kind: "data"},
+				&PolicyUrl{Url: "github.com/org/repo1//policy/", Kind: PolicyKind},
+				&PolicyUrl{Url: "github.com/org/repo2//policy/", Kind: PolicyKind},
+				&PolicyUrl{Url: "github.com/org/repo3//policy/", Kind: PolicyKind},
+				&PolicyUrl{Url: "github.com/org/repo1//data/", Kind: DataKind},
+				&PolicyUrl{Url: "github.com/org/repo2//data/", Kind: DataKind},
+				&PolicyUrl{Url: "github.com/org/repo3//data/", Kind: DataKind},
 			},
 			err: nil,
 		},
@@ -164,8 +169,8 @@ func TestFetchPolicySources(t *testing.T) {
 				RuleData: &extv1.JSON{Raw: []byte(`"foo":"bar"`)},
 			},
 			expected: []PolicySource{
-				&PolicyUrl{Url: "github.com/org/repo1//policy/", Kind: "policy"},
-				&PolicyUrl{Url: "github.com/org/repo1//data/", Kind: "data"},
+				&PolicyUrl{Url: "github.com/org/repo1//policy/", Kind: PolicyKind},
+				&PolicyUrl{Url: "github.com/org/repo1//data/", Kind: DataKind},
 				inlineData{source: []byte("{\"rule_data__configuration__\":\"foo\":\"bar\"}")},
 			},
 			err: nil,
@@ -200,6 +205,10 @@ func (mockPolicySource) PolicyUrl() string {
 
 func (mockPolicySource) Subdir() string {
 	return "mock"
+}
+
+func (mockPolicySource) Type() PolicyType {
+	return PolicyKind
 }
 
 func TestGetPolicyThroughCache(t *testing.T) {

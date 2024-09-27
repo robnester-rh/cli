@@ -59,7 +59,7 @@
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ],
@@ -108,7 +108,7 @@ Error: success criteria not met
       "source": {},
       "violations": [
         {
-          "msg": "Failure due to overripeness"
+          "msg": "Failure due to spider attack"
         },
         {
           "msg": "Failure due to spider attack"
@@ -161,18 +161,18 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/banana_check.git"
+          "git::https:?ref=c6cafb797f5afa8b9c7b1c54ea7bf0ca35368e21//${GITHOST}/git/banana_check.git"
         ],
         "data": [
-          "git::https://${GITHOST}/git/banana_data_1.git"
+          "git::https:?ref=62e50acbb1a230a3f11ca1858fc053b21fe5cc82//${GITHOST}/git/banana_data_1.git"
         ]
       },
       {
         "policy": [
-          "git::https://${GITHOST}/git/banana_check.git"
+          "git::https:?ref=c6cafb797f5afa8b9c7b1c54ea7bf0ca35368e21//${GITHOST}/git/banana_check.git"
         ],
         "data": [
-          "git::https://${GITHOST}/git/banana_data_2.git"
+          "git::https:?ref=0bc6d92de9503d62cb61a103199ee534e197a7dc//${GITHOST}/git/banana_data_2.git"
         ]
       }
     ],
@@ -250,7 +250,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ],
@@ -327,7 +327,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ],
@@ -406,7 +406,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/future-deny-policy.git"
+          "git::https:?ref=d55c1420ee4b6d58c11cd59446e8bdc824066fa8//${GITHOST}/git/future-deny-policy.git"
         ]
       }
     ],
@@ -698,7 +698,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/mismatched-image-digest.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/mismatched-image-digest.git"
         ]
       }
     ],
@@ -782,7 +782,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=2cda0fe9edc37b37b46a40d3094afed63883199c//${GITHOST}/git/happy-day-policy.git"
         ],
         "config": {
           "exclude": [
@@ -875,7 +875,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=2cda0fe9edc37b37b46a40d3094afed63883199c//${GITHOST}/git/happy-day-policy.git"
         ],
         "config": {
           "include": [
@@ -971,7 +971,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ],
@@ -1073,9 +1073,9 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/repository1.git",
-          "git::https://${GITHOST}/git/repository2.git",
-          "git::https://${GITHOST}/git/repository3.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/repository1.git",
+          "git::https:?ref=9998384962ba66481defc409b0f821d222ba3366//${GITHOST}/git/repository2.git",
+          "git::https:?ref=6b0858801d25246d0fc4b854691f4415b11a92f3//${GITHOST}/git/repository3.git"
         ]
       }
     ],
@@ -1122,7 +1122,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/unexpected-keyless-cert.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/unexpected-keyless-cert.git"
         ]
       }
     ]
@@ -1167,7 +1167,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/invalid-image-signature.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/invalid-image-signature.git"
         ]
       }
     ],
@@ -1245,7 +1245,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=2cda0fe9edc37b37b46a40d3094afed63883199c//${GITHOST}/git/happy-day-policy.git"
         ],
         "config": {
           "exclude": [
@@ -1277,7 +1277,7 @@ Error: success criteria not met
 
 [happy day with missing git config:stderr - 1]
 Error: 1 error occurred:
-    * no suitable config file found at git::https://${GITHOST}/git/happy-config.git
+    * no suitable config file found at git::https:?ref=422fe572a3f8da032907875299f218ef565e992a//${GITHOST}/git/happy-config.git
 
 
 
@@ -1346,7 +1346,7 @@ Error: 1 error occurred:
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/future-deny-policy.git"
+          "git::https:?ref=d55c1420ee4b6d58c11cd59446e8bdc824066fa8//${GITHOST}/git/future-deny-policy.git"
         ]
       }
     ],
@@ -1424,7 +1424,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ],
@@ -1555,7 +1555,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=4bc7c5cd5356565a3c094832b8787d22d45d4ea0//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ]
@@ -1601,7 +1601,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/mismatched-image-digest.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/mismatched-image-digest.git"
         ]
       }
     ],
@@ -1679,7 +1679,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ],
@@ -1809,7 +1809,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=1782339c40395d643cf47526f75f8008d3f4ad7f//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ],
@@ -1942,7 +1942,7 @@ Results:
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/future-deny-policy.git"
+          "git::https:?ref=d55c1420ee4b6d58c11cd59446e8bdc824066fa8//${GITHOST}/git/future-deny-policy.git"
         ]
       }
     ],
@@ -2020,8 +2020,8 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "oci::https://${REGISTRY}/acceptance/happy-day-policy:tag",
-          "oci::${REGISTRY}/acceptance/allow-all:latest"
+          "oci@sha256:${REGISTRY_acceptance/happy-day-policy:tag_DIGEST}",
+          "oci@sha256:${REGISTRY_acceptance/allow-all:latest_DIGEST}"
         ]
       }
     ],
@@ -2113,7 +2113,7 @@ ${TEMP}/ec-work-${RANDOM}/policy/${RANDOM}/main.rego:34: rego_type_error: undefi
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/happy-day-policy.git"
         ]
       }
     ],
@@ -2190,7 +2190,7 @@ ${TEMP}/ec-work-${RANDOM}/policy/${RANDOM}/main.rego:34: rego_type_error: undefi
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/happy-day-policy.git"
         ],
         "ruleData": {
           "key": "value"
@@ -2280,7 +2280,7 @@ ${TEMP}/ec-work-${RANDOM}/policy/${RANDOM}/main.rego:34: rego_type_error: undefi
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/with-dependencies.git"
+          "git::https:?ref=08dabc3b894fde79931ad853d98a6df653aa5ef3//${GITHOST}/git/with-dependencies.git"
         ]
       }
     ],
@@ -2372,7 +2372,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/unique-successes.git"
+          "git::https:?ref=1d2e54e08dfa96600f56f45f1319de58de089b00//${GITHOST}/git/unique-successes.git"
         ]
       }
     ],
@@ -2505,7 +2505,7 @@ ${__________known_PUBLIC_KEY}
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/image-config-policy.git"
+          "git::https:?ref=5b041b32ed5ac517540144eb842b2e9c7eb9a4a5//${GITHOST}/git/image-config-policy.git"
         ]
       }
     ],
@@ -2556,7 +2556,7 @@ ${__________known_PUBLIC_KEY}
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/my-policy.git"
+          "git::https:?ref=6678fcaee698bfba26f528554df53f1bba2c9f98//${GITHOST}/git/my-policy.git"
         ]
       }
     ],
@@ -2705,7 +2705,7 @@ ${__________known_PUBLIC_KEY}
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/ignore-rekor.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/ignore-rekor.git"
         ]
       }
     ],
@@ -2750,7 +2750,7 @@ ${__________known_PUBLIC_KEY}
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/rekor-by-default.git"
+          "git::https:?ref=95175b6ea9bb28c645186c6624ff904812ebbca7//${GITHOST}/git/rekor-by-default.git"
         ]
       }
     ],
@@ -3096,7 +3096,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/olm-manifests.git"
+          "git::https:?ref=c6eb1e4b10f3b9b318a7c05f2a7d0b386eb121f9//${GITHOST}/git/olm-manifests.git"
         ]
       }
     ],
@@ -3186,7 +3186,7 @@ Error: 1 error occurred:
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/fetch-oci-blob-policy.git"
+          "git::https:?ref=073ccc6dd739a80b1b0e76eb089a4c471610b614//${GITHOST}/git/fetch-oci-blob-policy.git"
         ]
       }
     ],
@@ -3263,7 +3263,7 @@ Error: 1 error occurred:
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/happy-day-policy.git"
+          "git::https:?ref=2cda0fe9edc37b37b46a40d3094afed63883199c//${GITHOST}/git/happy-day-policy.git"
         ],
         "config": {
           "exclude": [
@@ -3370,7 +3370,7 @@ Error: 1 error occurred:
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/purl-policy.git"
+          "git::https:?ref=60bd6ff9dbec7e55bd22e8662accab538c7cc0e8//${GITHOST}/git/purl-policy.git"
         ]
       }
     ],
@@ -3449,7 +3449,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/oci-image-manifest-policy"
+          "git::https:?ref=ced975fb15300bbf8628c7e9e5044da6fd454b66//${GITHOST}/git/oci-image-manifest-policy"
         ]
       }
     ],
@@ -3526,7 +3526,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/sigstore.git"
+          "git::https:?ref=ef7e3b8d9e04c3963ac16fed8efffa680f6a5c40//${GITHOST}/git/sigstore.git"
         ]
       }
     ],
@@ -4803,7 +4803,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/my-policy.git"
+          "git::https:?ref=1782339c40395d643cf47526f75f8008d3f4ad7f//${GITHOST}/git/my-policy.git"
         ]
       }
     ],
@@ -4876,7 +4876,7 @@ Error: success criteria not met
     "sources": [
       {
         "policy": [
-          "git::https://${GITHOST}/git/oci-image-files-policy"
+          "git::https:?ref=5d3124c555e8d74a4031f283df3dd09920f7230f//${GITHOST}/git/oci-image-files-policy"
         ]
       }
     ],

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	hd "github.com/MakeNowJust/heredoc"
+	ociMetadata "github.com/enterprise-contract/go-gather/metadata/oci"
 	"github.com/gkampitakis/go-snaps/snaps"
 	app "github.com/konflux-ci/application-api/api/v1alpha1"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
@@ -46,8 +47,6 @@ import (
 	"github.com/enterprise-contract/ec-cli/internal/utils"
 	"github.com/enterprise-contract/ec-cli/internal/utils/oci"
 	"github.com/enterprise-contract/ec-cli/internal/utils/oci/fake"
-	"github.com/enterprise-contract/go-gather/metadata"
-	ociMetadata "github.com/enterprise-contract/go-gather/metadata/oci"
 )
 
 type data struct {
@@ -98,16 +97,6 @@ func happyValidator() imageValidationFunc {
 			ExitCode: 0,
 		}, nil
 	}
-}
-
-type MockDownloader struct {
-	mock.Mock
-}
-
-func (m *MockDownloader) Download(_ context.Context, dest string, sourceUrl string, showMsg bool) (metadata.Metadata, error) {
-	args := m.Called(dest, sourceUrl, showMsg)
-
-	return args.Get(0).(metadata.Metadata), args.Error(1)
 }
 
 func Test_determineInputSpec(t *testing.T) {

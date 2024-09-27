@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/enterprise-contract/go-gather/metadata"
 	fileMetadata "github.com/enterprise-contract/go-gather/metadata/file"
 	gitMetadata "github.com/enterprise-contract/go-gather/metadata/git"
+	httpMetadata "github.com/enterprise-contract/go-gather/metadata/http"
 	ociMetadata "github.com/enterprise-contract/go-gather/metadata/oci"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -45,14 +47,15 @@ import (
 
 type (
 	key        int
-	policyKind string
+	PolicyType string
 )
 
 const (
 	DownloaderFuncKey key        = 0
-	PolicyKind        policyKind = "policy"
-	DataKind          policyKind = "data"
-	ConfigKind        policyKind = "config"
+	PolicyKind        PolicyType = "policy"
+	DataKind          PolicyType = "data"
+	ConfigKind        PolicyType = "config"
+	InlineDataKind    PolicyType = "inline-data"
 )
 
 type downloaderFunc interface {
@@ -63,16 +66,15 @@ type downloaderFunc interface {
 // Must implement the GetPolicy() method.
 type PolicySource interface {
 	GetPolicy(ctx context.Context, dest string, showMsg bool) (string, error)
-	GetPolicyWithMetadata(ctx context.Context, dest string, showMsg bool) (string, metadata.Metadata, error)
 	PolicyUrl() string
 	Subdir() string
+	Type() PolicyType
 }
 
 type PolicyUrl struct {
 	// A string containing a go-getter style source url compatible with conftest pull
-	Url string
-	// Either "data", "policy", or "config"
-	Kind policyKind
+	Url  string
+	Kind PolicyType
 }
 
 // downloadCache is a concurrent map used to cache downloaded files.
@@ -159,20 +161,17 @@ func (p *PolicyUrl) GetPolicy(ctx context.Context, workDir string, showMsg bool)
 		return downloader.Download(ctx, dest, source, showMsg)
 	}
 
-	dest, _, err := getPolicyThroughCache(ctx, p, workDir, dl)
-	return dest, err
-}
-
-func (p *PolicyUrl) GetPolicyWithMetadata(ctx context.Context, workDir string, showMsg bool) (string, metadata.Metadata, error) {
-	sourceUrl := p.PolicyUrl()
-	dest := uniqueDestination(workDir, p.Subdir(), sourceUrl)
-	x := ctx.Value(DownloaderFuncKey)
-	if dl, ok := x.(downloaderFunc); ok {
-		m, err := dl.Download(ctx, dest, sourceUrl, showMsg)
-		return dest, m, err
+	dest, metadata, err := getPolicyThroughCache(ctx, p, workDir, dl)
+	if err != nil {
+		return "", err
 	}
-	m, err := downloader.Download(ctx, dest, sourceUrl, showMsg)
-	return dest, m, err
+
+	p.Url, err = getPinnedUrl(p.Url, metadata)
+	if err != nil {
+		return "", err
+	}
+
+	return dest, err
 }
 
 func (p *PolicyUrl) PolicyUrl() string {
@@ -182,6 +181,40 @@ func (p *PolicyUrl) PolicyUrl() string {
 func (p *PolicyUrl) Subdir() string {
 	// Be lazy and assume the kind value is the same as the subdirectory we want
 	return string(p.Kind)
+}
+
+func (p PolicyUrl) Type() PolicyType {
+	return p.Kind
+}
+
+func getPinnedUrl(u string, m metadata.Metadata) (string, error) {
+	if m == nil {
+		return "", fmt.Errorf("metadata is nil")
+	}
+
+	if len(u) == 0 {
+		return "", fmt.Errorf("url is empty")
+	}
+
+	switch t := m.(type) {
+	case *gitMetadata.GitMetadata:
+		url := strings.Split(strings.Split(u, "//")[0], "?")[0]
+		path := strings.Split(u, "//")[1]
+		url = fmt.Sprintf("%s?ref=%s", url, t.LatestCommit)
+		if path != "" {
+			url = fmt.Sprintf("%s//%s", url, path)
+		}
+		return url, nil
+	case *ociMetadata.OCIMetadata:
+		url := strings.Split(strings.Split(u, "//")[0], ":")[0]
+		return fmt.Sprintf("%s@%s", url, t.Digest), nil
+	case *httpMetadata.HTTPMetadata:
+		return u, nil
+	case *fileMetadata.FileMetadata:
+		return u, nil
+	default:
+		return "", fmt.Errorf("unknown metadata type")
+	}
 }
 
 func uniqueDestination(rootDir string, subdir string, sourceUrl string) string {
@@ -253,17 +286,21 @@ func (s inlineData) Subdir() string {
 	return "data"
 }
 
+func (inlineData) Type() PolicyType {
+	return InlineDataKind
+}
+
 // FetchPolicySources returns an array of policy sources
 func FetchPolicySources(s ecc.Source) ([]PolicySource, error) {
 	policySources := make([]PolicySource, 0, len(s.Policy)+len(s.Data))
 
 	for _, policySourceUrl := range s.Policy {
-		url := PolicyUrl{Url: policySourceUrl, Kind: "policy"}
+		url := PolicyUrl{Url: policySourceUrl, Kind: PolicyKind}
 		policySources = append(policySources, &url)
 	}
 
 	for _, dataSourceUrl := range s.Data {
-		url := PolicyUrl{Url: dataSourceUrl, Kind: "data"}
+		url := PolicyUrl{Url: dataSourceUrl, Kind: DataKind}
 		policySources = append(policySources, &url)
 	}
 

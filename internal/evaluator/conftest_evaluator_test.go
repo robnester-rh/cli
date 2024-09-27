@@ -85,6 +85,10 @@ func (t testPolicySource) Subdir() string {
 	return "policy"
 }
 
+func (testPolicySource) Type() source.PolicyType {
+	return source.PolicyKind
+}
+
 type mockDownloader struct {
 	mock.Mock
 }

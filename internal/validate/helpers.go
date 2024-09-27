@@ -21,14 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/enterprise-contract/go-gather/metadata"
-	fileMetadata "github.com/enterprise-contract/go-gather/metadata/file"
-	gitMetadata "github.com/enterprise-contract/go-gather/metadata/git"
-	httpMetadata "github.com/enterprise-contract/go-gather/metadata/http"
-	ociMetadata "github.com/enterprise-contract/go-gather/metadata/oci"
+	"github.com/enterprise-contract/enterprise-contract-controller/api/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"sigs.k8s.io/yaml"
 
 	"github.com/enterprise-contract/ec-cli/internal/cache"
 	"github.com/enterprise-contract/ec-cli/internal/policy"
@@ -109,7 +104,8 @@ func PreProcessPolicy(ctx context.Context, policyOptions policy.Options) (policy
 		return nil, nil, err
 	}
 
-	for _, sourceGroup := range p.Spec().Sources {
+	sources := p.Spec().Sources
+	for i, sourceGroup := range sources {
 		log.Debugf("Fetching policy source group '%+v'\n", sourceGroup.Name)
 		policySources, err := source.FetchPolicySources(sourceGroup)
 		if err != nil {
@@ -126,105 +122,49 @@ func PreProcessPolicy(ctx context.Context, policyOptions policy.Options) (policy
 		}
 
 		for _, policySource := range policySources {
-			if !strings.HasPrefix(policySource.PolicyUrl(), "data:") {
-				destDir, metadata, err := policySource.GetPolicyWithMetadata(ctx, dir, false)
-				if err != nil {
-					log.Debugf("Unable to download source from %s!", policySource.PolicyUrl())
-					return nil, nil, err
-				}
-				log.Debugf("Downloaded policy source from %s to %s\n", policySource.PolicyUrl(), destDir)
-				pinnedURL, err := GetPinnedUrl(policySource.PolicyUrl(), metadata)
-				if err != nil {
-					return nil, nil, err
-				}
+			if strings.HasPrefix(policySource.PolicyUrl(), "data:") {
+				continue
+			}
 
-				if _, found := policyCache.Get(pinnedURL); !found {
-					log.Debugf("Cache miss for: %s, adding to cache", pinnedURL)
-					policyCache.Set(pinnedURL, destDir, nil)
-					pinnedPolicyUrls[policySource.Subdir()] = append(pinnedPolicyUrls[policySource.Subdir()], pinnedURL)
-					log.Debugf("Added %s to the pinnedPolicyUrls in \"%s\"", pinnedURL, policySource.Subdir())
-				} else {
-					log.Debugf("Cache hit for: %s", pinnedURL)
-				}
+			destDir, err := policySource.GetPolicy(ctx, dir, false)
+			if err != nil {
+				log.Debugf("Unable to download source from %s!", policySource.PolicyUrl())
+				return nil, nil, err
+			}
+			log.Debugf("Downloaded policy source from %s to %s\n", policySource.PolicyUrl(), destDir)
 
+			url := policySource.PolicyUrl()
+
+			if _, found := policyCache.Get(policySource.PolicyUrl()); !found {
+				log.Debugf("Cache miss for: %s, adding to cache", url)
+				policyCache.Set(url, destDir, nil)
+				pinnedPolicyUrls[policySource.Subdir()] = append(pinnedPolicyUrls[policySource.Subdir()], url)
+				log.Debugf("Added %s to the pinnedPolicyUrls in \"%s\"", url, policySource.Subdir())
+			} else {
+				log.Debugf("Cache hit for: %s", url)
 			}
 		}
-	}
 
-	policyRef := policyOptions.PolicyRef
-
-	var result map[string]interface{}
-	err = yaml.Unmarshal([]byte(policyRef), &result)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var sources []interface{}
-	if spec, ok := result["spec"].(map[string]interface{}); ok {
-		if s, ok := spec["sources"].([]interface{}); ok {
-			sources = s
-		}
-	}
-	if s, ok := result["sources"].([]interface{}); ok {
-		sources = s
-	}
-
-	for _, source := range sources {
-		sourceMap, ok := source.(map[string]interface{})
-		if !ok {
-			log.Debugf("skipping %+v: source item is not a map", sourceMap)
-			continue
-		}
-
-		if len(pinnedPolicyUrls["policy"]) > 0 {
-			sourceMap["policy"] = pinnedPolicyUrls["policy"]
-		}
-
-		if len(pinnedPolicyUrls["data"]) > 0 {
-			sourceMap["data"] = pinnedPolicyUrls["data"]
-		}
-	}
-	if len(result) > 0 {
-		policyConfigYaml, err := yaml.Marshal(result)
-		if err != nil {
-			return nil, nil, err
-		}
-		policyOptions.PolicyRef = string(policyConfigYaml)
-		p, err = policy.NewPolicy(ctx, policyOptions)
-		if err != nil {
-			return nil, nil, err
+		sources[i] = v1alpha1.Source{
+			Name:           sourceGroup.Name,
+			Policy:         urls(policySources, source.PolicyKind),
+			Data:           urls(policySources, source.DataKind),
+			RuleData:       sourceGroup.RuleData,
+			Config:         sourceGroup.Config,
+			VolatileConfig: sourceGroup.VolatileConfig,
 		}
 	}
 
 	return p, policyCache, err
 }
 
-func GetPinnedUrl(u string, m metadata.Metadata) (string, error) {
-	if m == nil {
-		return "", fmt.Errorf("metadata is nil")
-	}
-
-	if len(u) == 0 {
-		return "", fmt.Errorf("url is empty")
-	}
-
-	switch t := m.(type) {
-	case *gitMetadata.GitMetadata:
-		url := strings.Split(strings.Split(u, "//")[0], "?")[0]
-		path := strings.Split(u, "//")[1]
-		url = fmt.Sprintf("%s?ref=%s", url, t.LatestCommit)
-		if path != "" {
-			url = fmt.Sprintf("%s//%s", url, path)
+func urls(s []source.PolicySource, kind source.PolicyType) []string {
+	ret := make([]string, 0, len(s))
+	for _, u := range s {
+		if u.Type() == kind {
+			ret = append(ret, u.PolicyUrl())
 		}
-		return url, nil
-	case *ociMetadata.OCIMetadata:
-		url := strings.Split(strings.Split(u, "//")[0], ":")[0]
-		return fmt.Sprintf("%s@%s", url, t.Digest), nil
-	case *httpMetadata.HTTPMetadata:
-		return u, nil
-	case *fileMetadata.FileMetadata:
-		return u, nil
-	default:
-		return "", fmt.Errorf("unknown metadata type")
 	}
+
+	return ret
 }

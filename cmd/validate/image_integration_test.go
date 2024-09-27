@@ -45,17 +45,19 @@ import (
 )
 
 func TestEvaluatorLifecycle(t *testing.T) {
+	noEvaluators := 100
+
 	ctx := utils.WithFS(context.Background(), afero.NewMemMapFs())
 	client := fake.FakeClient{}
 	commonMockClient(&client)
 	ctx = oci.WithClient(ctx, &client)
 	mdl := MockDownloader{}
-	mdl.On("Download", mock.Anything, mock.Anything, false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil)
+	downloaderCall := mdl.On("Download", mock.Anything, mock.Anything, false).Return(&ociMetadata.OCIMetadata{Digest: "sha256:da54bca5477bf4e3449bc37de1822888fa0fbb8d89c640218cb31b987374d357"}, nil).Times(noEvaluators)
 	ctx = context.WithValue(ctx, source.DownloaderFuncKey, &mdl)
-	noEvaluators := 100
 
 	evaluators := make([]*mockEvaluator, 0, noEvaluators)
-	expectations := make([]*mock.Call, 0, noEvaluators)
+	expectations := make([]*mock.Call, 0, noEvaluators+1)
+	expectations = append(expectations, downloaderCall)
 
 	for i := 0; i < noEvaluators; i++ {
 		e := mockEvaluator{}
