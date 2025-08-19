@@ -38,15 +38,33 @@ import (
 	"github.com/conforma/cli/internal/version"
 )
 
+// VSAExpirationStatus represents the expiration status of a VSA
+type VSAExpirationStatus string
+
+const (
+	VSAStatusFresh   VSAExpirationStatus = "fresh"
+	VSAStatusExpired VSAExpirationStatus = "expired"
+	VSAStatusMissing VSAExpirationStatus = "missing"
+)
+
+// VSAExpirationResult contains the result of VSA expiration check
+type VSAExpirationResult struct {
+	Status        VSAExpirationStatus `json:"status"`
+	Timestamp     *time.Time          `json:"timestamp,omitempty"`
+	ExpirationAge *time.Duration      `json:"expiration_age,omitempty"`
+	Message       string              `json:"message"`
+}
+
 type Component struct {
 	app.SnapshotComponent
-	Violations   []evaluator.Result          `json:"violations,omitempty"`
-	Warnings     []evaluator.Result          `json:"warnings,omitempty"`
-	Successes    []evaluator.Result          `json:"successes,omitempty"`
-	Success      bool                        `json:"success"`
-	SuccessCount int                         `json:"-"`
-	Signatures   []signature.EntitySignature `json:"signatures,omitempty"`
-	Attestations []AttestationResult         `json:"attestations,omitempty"`
+	Violations    []evaluator.Result          `json:"violations,omitempty"`
+	Warnings      []evaluator.Result          `json:"warnings,omitempty"`
+	Successes     []evaluator.Result          `json:"successes,omitempty"`
+	Success       bool                        `json:"success"`
+	SuccessCount  int                         `json:"-"`
+	Signatures    []signature.EntitySignature `json:"signatures,omitempty"`
+	Attestations  []AttestationResult         `json:"attestations,omitempty"`
+	VSAExpiration *VSAExpirationResult        `json:"vsa_expiration,omitempty"`
 }
 
 type Report struct {

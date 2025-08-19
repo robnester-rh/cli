@@ -24,6 +24,7 @@ import (
 	"runtime/trace"
 	"sort"
 	"strings"
+	"time"
 
 	hd "github.com/MakeNowJust/heredoc"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -79,9 +80,11 @@ func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 		vsaEnabled                  bool
 		vsaSigningKey               string
 		vsaUpload                   string
+		vsaExpirationThreshold      time.Duration
 	}{
-		strict:  true,
-		workers: 5,
+		strict:                 true,
+		workers:                5,
+		vsaExpirationThreshold: 24 * time.Hour, // Default to 24 hours
 	}
 
 	validOutputFormats := applicationsnapshot.OutputFormats
@@ -445,6 +448,17 @@ func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 				return components[i].ContainerImage > components[j].ContainerImage
 			})
 
+			// Check VSA expiration for each component if Rekor URL is available
+			if !data.ignoreRekor && data.rekorURL != "" {
+				log.Debug("Checking VSA expiration for components")
+				err := checkVSAExpirationForComponents(cmd.Context(), &components, data.rekorURL, data.vsaExpirationThreshold)
+				if err != nil {
+					log.Warnf("Failed to check VSA expiration: %v", err)
+				}
+			} else {
+				log.Debug("Skipping VSA expiration check: Rekor is ignored or URL not provided")
+			}
+
 			if len(data.outputFile) > 0 {
 				data.output = append(data.output, fmt.Sprintf("%s=%s", applicationsnapshot.JSON, data.outputFile))
 			}
@@ -594,6 +608,7 @@ func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 	cmd.Flags().BoolVar(&data.vsaEnabled, "vsa", false, "Generate a Verification Summary Attestation (VSA) for each validated image.")
 	cmd.Flags().StringVar(&data.vsaSigningKey, "vsa-signing-key", "", "Path to the private key for signing the VSA.")
 	cmd.Flags().StringVar(&data.vsaUpload, "vsa-upload", "oci", "Where to upload the VSA attestation: oci, rekor, none")
+	cmd.Flags().DurationVar(&data.vsaExpirationThreshold, "vsa-max-age", 24*time.Hour, "Maximum age for VSA expiration check. VSAs older than this duration are considered expired.")
 
 	if len(data.input) > 0 || len(data.filePath) > 0 || len(data.images) > 0 {
 		if err := cmd.MarkFlagRequired("image"); err != nil {
@@ -613,4 +628,76 @@ func containsOutput(data []string, value string) bool {
 		}
 	}
 	return false
+}
+
+// checkVSAExpirationForComponents checks VSA expiration for all components
+func checkVSAExpirationForComponents(ctx context.Context, components *[]applicationsnapshot.Component, rekorURL string, threshold time.Duration) error {
+	if len(*components) == 0 {
+		return nil
+	}
+
+	// Create retrieval options
+	opts := vsa.RetrievalOptions{
+		URL:     rekorURL,
+		Timeout: 30 * time.Second,
+	}
+
+	// Create VSA retriever
+	retriever, err := vsa.NewRekorVSARetriever(opts)
+	if err != nil {
+		return fmt.Errorf("failed to create VSA retriever: %w", err)
+	}
+
+	// Create VSA expiration checker
+	checker := vsa.NewVSAExpirationChecker(retriever, threshold)
+
+	// Check expiration for each component
+	for i := range *components {
+		comp := &(*components)[i]
+
+		// Extract image digest from container image
+		imageRef, err := name.ParseReference(comp.ContainerImage)
+		if err != nil {
+			log.Warnf("Failed to parse image reference %s: %v", comp.ContainerImage, err)
+			comp.VSAExpiration = &applicationsnapshot.VSAExpirationResult{
+				Status:  applicationsnapshot.VSAStatusMissing,
+				Message: fmt.Sprintf("Failed to parse image reference: %v", err),
+			}
+			continue
+		}
+
+		// Resolve digest if not already in digest format
+		var digest string
+		if d, ok := imageRef.(name.Digest); ok {
+			digest = d.DigestStr()
+		} else {
+			// Need to resolve the digest from the tag
+			client := oci.NewClient(ctx)
+			resolvedDigest, err := client.ResolveDigest(imageRef)
+			if err != nil {
+				log.Warnf("Failed to resolve digest for image %s: %v", comp.ContainerImage, err)
+				comp.VSAExpiration = &applicationsnapshot.VSAExpirationResult{
+					Status:  applicationsnapshot.VSAStatusMissing,
+					Message: fmt.Sprintf("Failed to resolve digest: %v", err),
+				}
+				continue
+			}
+			digest = resolvedDigest
+		}
+
+		// Check VSA expiration
+		result, err := checker.CheckVSAExpiration(ctx, digest)
+		if err != nil {
+			log.Warnf("Failed to check VSA expiration for component %s: %v", comp.Name, err)
+			comp.VSAExpiration = &applicationsnapshot.VSAExpirationResult{
+				Status:  applicationsnapshot.VSAStatusMissing,
+				Message: fmt.Sprintf("Error checking VSA: %v", err),
+			}
+		} else {
+			comp.VSAExpiration = result
+			log.Debugf("VSA expiration check for component %s: %s", comp.Name, result.Status)
+		}
+	}
+
+	return nil
 }
