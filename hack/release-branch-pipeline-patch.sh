@@ -46,7 +46,7 @@ MAIN_PUSH_PIPELINE=.tekton/cli-main-push.yaml
 RELEASE_PR_PIPELINE=.tekton/cli-v$VER-pull-request.yaml
 RELEASE_PUSH_PIPELINE=.tekton/cli-v$VER-push.yaml
 
-OLD_VERSION=0.6 # Fixme: This should not be hard coded
+OLD_VERSION="0.$((${VERSION#*.} - 1))"
 OLD_VER=${OLD_VERSION/.}
 OLD_RELEASE_PR_PIPELINE=.tekton/cli-v$OLD_VER-pull-request.yaml
 OLD_RELEASE_PUSH_PIPELINE=.tekton/cli-v$OLD_VER-push.yaml
