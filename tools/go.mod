@@ -12,7 +12,7 @@ require (
 	github.com/wadey/gocovmerge v0.0.0-20160331181800-b5bfa59ec0ad
 	gotest.tools/gotestsum v1.12.1
 	helm.sh/helm/v3 v3.18.5
-	k8s.io/kubernetes v1.31.6
+	k8s.io/kubernetes v1.31.12
 	sigs.k8s.io/kustomize/kustomize/v5 v5.6.0
 )
 
