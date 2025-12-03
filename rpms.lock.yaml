@@ -42,25 +42,7 @@ arches:
     name: jq
     evr: 1.6-19.el9
     sourcerpm: jq-1.6-19.el9.src.rpm
-  source:
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/appstream/source/SRPMS/Packages/o/oniguruma-6.9.6-1.el9.5.src.rpm
-    repoid: ubi-9-for-aarch64-appstream-source-rpms
-    size: 934541
-    checksum: sha256:cba17754ccaffd886995aec7f152aadbc5d9932a2a2cdf1d983291c7b2838404
-    name: oniguruma
-    evr: 6.9.6-1.el9.5
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/source/SRPMS/Packages/g/gzip-1.12-1.el9.src.rpm
-    repoid: ubi-9-for-aarch64-baseos-source-rpms
-    size: 856147
-    checksum: sha256:a05f582ec42e89258ee5e10af96dee4300bcb2a6a69a76bfb5b46f79e6a6a47b
-    name: gzip
-    evr: 1.12-1.el9
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/aarch64/baseos/source/SRPMS/Packages/j/jq-1.6-19.el9.src.rpm
-    repoid: ubi-9-for-aarch64-baseos-source-rpms
-    size: 1505339
-    checksum: sha256:a36173a7f5461f8cc1b6aa9e62f3e0435d6fde658a8795c909fd62cb5bfc9565
-    name: jq
-    evr: 1.6-19.el9
+  source: []
   module_metadata: []
 - arch: ppc64le
   packages:
@@ -85,25 +67,7 @@ arches:
     name: jq
     evr: 1.6-19.el9
     sourcerpm: jq-1.6-19.el9.src.rpm
-  source:
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/appstream/source/SRPMS/Packages/o/oniguruma-6.9.6-1.el9.5.src.rpm
-    repoid: ubi-9-for-ppc64le-appstream-source-rpms
-    size: 934541
-    checksum: sha256:cba17754ccaffd886995aec7f152aadbc5d9932a2a2cdf1d983291c7b2838404
-    name: oniguruma
-    evr: 6.9.6-1.el9.5
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/source/SRPMS/Packages/g/gzip-1.12-1.el9.src.rpm
-    repoid: ubi-9-for-ppc64le-baseos-source-rpms
-    size: 856147
-    checksum: sha256:a05f582ec42e89258ee5e10af96dee4300bcb2a6a69a76bfb5b46f79e6a6a47b
-    name: gzip
-    evr: 1.12-1.el9
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/ppc64le/baseos/source/SRPMS/Packages/j/jq-1.6-19.el9.src.rpm
-    repoid: ubi-9-for-ppc64le-baseos-source-rpms
-    size: 1505339
-    checksum: sha256:a36173a7f5461f8cc1b6aa9e62f3e0435d6fde658a8795c909fd62cb5bfc9565
-    name: jq
-    evr: 1.6-19.el9
+  source: []
   module_metadata: []
 - arch: x86_64
   packages:
@@ -128,23 +92,5 @@ arches:
     name: jq
     evr: 1.6-19.el9
     sourcerpm: jq-1.6-19.el9.src.rpm
-  source:
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/appstream/source/SRPMS/Packages/o/oniguruma-6.9.6-1.el9.5.src.rpm
-    repoid: ubi-9-for-x86_64-appstream-source-rpms
-    size: 934541
-    checksum: sha256:cba17754ccaffd886995aec7f152aadbc5d9932a2a2cdf1d983291c7b2838404
-    name: oniguruma
-    evr: 6.9.6-1.el9.5
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/g/gzip-1.12-1.el9.src.rpm
-    repoid: ubi-9-for-x86_64-baseos-source-rpms
-    size: 856147
-    checksum: sha256:a05f582ec42e89258ee5e10af96dee4300bcb2a6a69a76bfb5b46f79e6a6a47b
-    name: gzip
-    evr: 1.12-1.el9
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/source/SRPMS/Packages/j/jq-1.6-19.el9.src.rpm
-    repoid: ubi-9-for-x86_64-baseos-source-rpms
-    size: 1505339
-    checksum: sha256:a36173a7f5461f8cc1b6aa9e62f3e0435d6fde658a8795c909fd62cb5bfc9565
-    name: jq
-    evr: 1.6-19.el9
+  source: []
   module_metadata: []
