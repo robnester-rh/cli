@@ -99,14 +99,14 @@ func startStubRegistry(ctx context.Context) (context.Context, error) {
 }
 
 // ImageReferenceInStubRegistry returns a reference for an image constructed by concatenating
-// the host:port/`name` where the name is formatted by the given format and arguments
-func ImageReferenceInStubRegistry(ctx context.Context, format string, args ...interface{}) (name.Reference, error) {
+// the host:port/`imageName`
+func ImageReferenceInStubRegistry(ctx context.Context, imageName string) (name.Reference, error) {
 	registry, err := StubRegistry(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	imageRef := registry + "/" + fmt.Sprintf(format, args...)
+	imageRef := registry + "/" + imageName
 
 	ref, err := name.ParseReference(imageRef)
 	if err != nil {
