@@ -31,8 +31,17 @@ echo "BUILDS=$BUILDS"
 
 export GO_COMPLIANCE_INFO=0
 
+# When building inside the container we're expecting these to be
+# mounted volumes
+if [[ -d "/go/cache" ]]; then
+    export GOCACHE=/go/cache
+fi
+if [[ -d "/go/mod" ]]; then
+    export GOMODCACHE=/go/mod
+fi
+
 build_ec() {
-    GOOS="$1" GOARCH="$2" go build \
+    GOOS="$1" GOARCH="$2" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" go build \
         -trimpath \
         --mod=readonly \
         -ldflags="-s -w -X github.com/enterprise-contract/ec-cli/internal/version.Version=$4" \
@@ -41,7 +50,7 @@ build_ec() {
 }
 
 build_kubectl() {
-    GOOS="$1" GOARCH="$2" go install \
+    GOOS="$1" GOARCH="$2" GOCACHE="$GOCACHE" GOMODCACHE="$GOMODCACHE" go install \
         -modfile tools/kubectl/go.mod \
         -trimpath \
         --mod=readonly \

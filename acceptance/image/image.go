@@ -198,7 +198,7 @@ func CreateAndPushImageSignature(ctx context.Context, imageName string, keyName 
 	}
 
 	// the name of the image + the <hash>.sig tag
-	ref, err := registry.ImageReferenceInStubRegistry(ctx, imageName+":%s-%s.sig", digest.Algorithm, digest.Hex)
+	ref, err := registry.ImageReferenceInStubRegistry(ctx, fmt.Sprintf("%s:%s-%s.sig", imageName, digest.Algorithm, digest.Hex))
 	if err != nil {
 		return ctx, err
 	}
@@ -306,7 +306,7 @@ func createAndPushAttestationWithPatches(ctx context.Context, imageName, keyName
 	}
 
 	// the name of the image + the <hash>.att tag
-	ref, err := registry.ImageReferenceInStubRegistry(ctx, imageName+":%s-%s.att", digest.Algorithm, digest.Hex)
+	ref, err := registry.ImageReferenceInStubRegistry(ctx, fmt.Sprintf("%s:%s-%s.att", imageName, digest.Algorithm, digest.Hex))
 	if err != nil {
 		return ctx, err
 	}
@@ -912,7 +912,7 @@ func steal(what string) func(context.Context, string, string) (context.Context, 
 			return ctx, err
 		}
 
-		fromRef, err := registry.ImageReferenceInStubRegistry(ctx, signatureFrom+":%s-%s.%s", fromDigest.Algorithm, fromDigest.Hex, what)
+		fromRef, err := registry.ImageReferenceInStubRegistry(ctx, fmt.Sprintf("%s:%s-%s.%s", signatureFrom, fromDigest.Algorithm, fromDigest.Hex, what))
 		if err != nil {
 			return ctx, err
 		}
@@ -932,7 +932,7 @@ func steal(what string) func(context.Context, string, string) (context.Context, 
 			return ctx, err
 		}
 
-		toRef, err := registry.ImageReferenceInStubRegistry(ctx, imageName+":%s-%s.%s", toDigest.Algorithm, toDigest.Hex, what)
+		toRef, err := registry.ImageReferenceInStubRegistry(ctx, fmt.Sprintf("%s:%s-%s.%s", imageName, toDigest.Algorithm, toDigest.Hex, what))
 		if err != nil {
 			return ctx, err
 		}
