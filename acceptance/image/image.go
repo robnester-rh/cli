@@ -198,7 +198,7 @@ func CreateAndPushImageSignature(ctx context.Context, imageName string, keyName 
 	}
 
 	// the name of the image + the <hash>.sig tag
-	ref, err := registry.ImageReferenceInStubRegistry(ctx, imageName+":%s-%s.sig", digest.Algorithm, digest.Hex)
+	ref, err := registry.ImageReferenceInStubRegistry(ctx, fmt.Sprintf("%s:%s-%s.sig", imageName, digest.Algorithm, digest.Hex))
 	if err != nil {
 		return ctx, err
 	}
@@ -306,7 +306,7 @@ func createAndPushAttestationWithPatches(ctx context.Context, imageName, keyName
 	}
 
 	// the name of the image + the <hash>.att tag
-	ref, err := registry.ImageReferenceInStubRegistry(ctx, imageName+":%s-%s.att", digest.Algorithm, digest.Hex)
+	ref, err := registry.ImageReferenceInStubRegistry(ctx, fmt.Sprintf("%s:%s-%s.att", imageName, digest.Algorithm, digest.Hex))
 	if err != nil {
 		return ctx, err
 	}
@@ -401,7 +401,7 @@ func createAndPushImageWithLayer(ctx context.Context, imageName string, files *g
 func createAndPushLayer(ctx context.Context, content string, imageName string) (context.Context, error) {
 	l := s.NewLayer([]byte(content), types.OCIUncompressedLayer)
 
-	ref, err := registry.ImageReferenceInStubRegistry(ctx, "%s", imageName)
+	ref, err := registry.ImageReferenceInStubRegistry(ctx, imageName)
 	if err != nil {
 		return ctx, err
 	}
@@ -489,7 +489,7 @@ func createAndPushPlainImage(ctx context.Context, imageName string, patch patchF
 		return ctx, "", err
 	}
 
-	ref, err := registry.ImageReferenceInStubRegistry(ctx, "%s", imageName)
+	ref, err := registry.ImageReferenceInStubRegistry(ctx, imageName)
 	if err != nil {
 		return ctx, "", err
 	}
@@ -535,7 +535,7 @@ func resolveRefDigest(url string) (string, error) {
 // createAndPushKeylessImage loads an existing image from disk, along its signature and attestation
 // into the docker registry.
 func createAndPushKeylessImage(ctx context.Context, imageName string) (context.Context, error) {
-	ref, err := registry.ImageReferenceInStubRegistry(ctx, "%s", imageName)
+	ref, err := registry.ImageReferenceInStubRegistry(ctx, imageName)
 	if err != nil {
 		return ctx, err
 	}
@@ -705,7 +705,7 @@ func createAndPushPolicyBundle(ctx context.Context, imageName string, files *god
 		}
 	}
 
-	ref, err := registry.ImageReferenceInStubRegistry(ctx, "%s", imageName)
+	ref, err := registry.ImageReferenceInStubRegistry(ctx, imageName)
 	if err != nil {
 		return ctx, err
 	}
@@ -912,7 +912,7 @@ func steal(what string) func(context.Context, string, string) (context.Context, 
 			return ctx, err
 		}
 
-		fromRef, err := registry.ImageReferenceInStubRegistry(ctx, signatureFrom+":%s-%s.%s", fromDigest.Algorithm, fromDigest.Hex, what)
+		fromRef, err := registry.ImageReferenceInStubRegistry(ctx, fmt.Sprintf("%s:%s-%s.%s", signatureFrom, fromDigest.Algorithm, fromDigest.Hex, what))
 		if err != nil {
 			return ctx, err
 		}
@@ -932,7 +932,7 @@ func steal(what string) func(context.Context, string, string) (context.Context, 
 			return ctx, err
 		}
 
-		toRef, err := registry.ImageReferenceInStubRegistry(ctx, imageName+":%s-%s.%s", toDigest.Algorithm, toDigest.Hex, what)
+		toRef, err := registry.ImageReferenceInStubRegistry(ctx, fmt.Sprintf("%s:%s-%s.%s", imageName, toDigest.Algorithm, toDigest.Hex, what))
 		if err != nil {
 			return ctx, err
 		}

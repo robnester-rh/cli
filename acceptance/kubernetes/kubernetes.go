@@ -496,7 +496,8 @@ func AddStepsTo(sc *godog.ScenarioContext) {
 
 		c := testenv.FetchState[ClusterState](ctx)
 
-		if !c.cluster.Up(ctx) {
+		// Guard against nil cluster to prevent panic
+		if c.cluster == nil || !c.cluster.Up(ctx) {
 			return ctx, nil
 		}
 
