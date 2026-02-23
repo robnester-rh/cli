@@ -42,6 +42,7 @@ import (
 	"github.com/conforma/cli/internal/output"
 	"github.com/conforma/cli/internal/policy"
 	"github.com/conforma/cli/internal/policy/source"
+	regooci "github.com/conforma/cli/internal/rego/oci"
 	"github.com/conforma/cli/internal/utils"
 	"github.com/conforma/cli/internal/utils/oci"
 	validate_utils "github.com/conforma/cli/internal/validate"
@@ -348,6 +349,12 @@ func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 						ctx, task = trace.NewTask(ctx, "ec:validate-component")
 						trace.Logf(ctx, "", "workerID=%d", id)
 					}
+
+					// Scope heavy OCI caches (blobs, image files) to this component's
+					// evaluation. Each component has unique image refs, so caching across
+					// components just accumulates dead data. When this iteration ends,
+					// the component-scoped cache is released for GC.
+					ctx = regooci.WithComponentCache(ctx)
 
 					log.Debugf("Worker %d got a component %q", id, comp.ContainerImage)
 

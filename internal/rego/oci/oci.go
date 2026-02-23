@@ -22,6 +22,7 @@ package oci
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -390,16 +391,21 @@ func ociBlob(bctx rego.BuiltinContext, a *ast.Term) (*ast.Term, error) {
 	refStr := string(uri)
 	logger = logger.WithField("ref", refStr)
 
+	// Use component-scoped cache if available, otherwise fall back to global.
+	// Blob data is heavy (1-10 MB each) and unique per component, so scoping
+	// prevents unbounded memory growth across many components.
+	cc := componentCacheFromContext(bctx.Context)
+
 	// Check cache first (fast path)
-	if cached, found := blobCache.Load(refStr); found {
+	if cached, found := cc.blobCache.Load(refStr); found {
 		logger.Debug("Blob served from cache")
 		return cached.(*ast.Term), nil
 	}
 
 	// Use singleflight to prevent thundering herd - only one goroutine fetches per key
-	result, err, _ := blobFlight.Do(refStr, func() (any, error) {
+	result, err, _ := cc.blobFlight.Do(refStr, func() (any, error) {
 		// Double-check cache inside singleflight (another goroutine may have populated it)
-		if cached, found := blobCache.Load(refStr); found {
+		if cached, found := cc.blobCache.Load(refStr); found {
 			logger.Debug("Blob served from cache (after singleflight)")
 			return cached, nil
 		}
@@ -466,7 +472,7 @@ func ociBlob(bctx rego.BuiltinContext, a *ast.Term) (*ast.Term, error) {
 		}).Debug("Successfully retrieved blob")
 
 		term := ast.StringTerm(blob.String())
-		blobCache.Store(refStr, term)
+		cc.blobCache.Store(refStr, term)
 		return term, nil
 	})
 
@@ -636,21 +642,25 @@ var maxParallelManifestFetches = runtime.GOMAXPROCS(0) * 4
 // Package-level caches for OCI operations.
 // OPA's Memoize only works within a single Eval() call, but we validate multiple
 // images in separate Eval() calls. These caches persist for the lifetime of the process.
-// All caches are keyed by the ref string (or ref+paths for image files).
 //
 // We use singleflight.Group alongside sync.Map to prevent thundering herd:
 // - sync.Map stores the cached results
 // - singleflight.Group ensures only one goroutine fetches a given key at a time
+//
+// Blob and imageFiles caches are component-scoped when a ComponentCache is present
+// in the context (via WithComponentCache). This prevents unbounded memory growth
+// when validating many components, since blob/imageFiles data is large and unique
+// per component. defaultComponentCache serves as the fallback when no ComponentCache
+// is set. Manifests, descriptors, and image indexes remain global because they are
+// small and benefit from cross-component sharing (e.g., shared task bundle manifests).
 var (
-	blobCache        sync.Map           // map[string]*ast.Term - for ociBlob
-	blobFlight       singleflight.Group // deduplicates concurrent blob fetches
-	descriptorCache  sync.Map           // map[string]*ast.Term - for ociDescriptor
+	defaultComponentCache = &ComponentCache{} // fallback for blob/imageFiles when no context cache
+
+	descriptorCache  sync.Map // map[string]*ast.Term - for ociDescriptor (always global)
 	descriptorFlight singleflight.Group
-	manifestCache    sync.Map // map[string]*ast.Term - for ociImageManifest
+	manifestCache    sync.Map // map[string]*ast.Term - for ociImageManifest (always global)
 	manifestFlight   singleflight.Group
-	imageFilesCache  sync.Map // map[string]*ast.Term - for ociImageFiles (key: ref+pathsHash)
-	imageFilesFlight singleflight.Group
-	imageIndexCache  sync.Map // map[string]*ast.Term - for ociImageIndex
+	imageIndexCache  sync.Map // map[string]*ast.Term - for ociImageIndex (always global)
 	imageIndexFlight singleflight.Group
 )
 
@@ -659,12 +669,45 @@ var batchCallCounter uint64
 
 // ClearCaches clears all package-level caches. This is primarily used for testing
 // to ensure tests don't interfere with each other via cached values.
+// Note: This only clears global caches. Component-scoped caches (blob, imageFiles)
+// are automatically released when the component's context goes out of scope.
 func ClearCaches() {
-	blobCache = sync.Map{}
+	defaultComponentCache = &ComponentCache{}
 	descriptorCache = sync.Map{}
 	manifestCache = sync.Map{}
-	imageFilesCache = sync.Map{}
 	imageIndexCache = sync.Map{}
+}
+
+// ComponentCache holds per-component caches for heavy OCI data (blobs and image files).
+// These are the two largest cache types — blobs can be 1-10 MB each, and image files
+// can also be substantial. Scoping them per-component prevents unbounded memory growth
+// when validating many components with unique image refs.
+//
+// Lighter caches (manifests, descriptors, image indexes) remain global because they
+// are small and benefit from cross-component sharing (e.g., shared task bundle manifests).
+type ComponentCache struct {
+	blobCache        sync.Map
+	blobFlight       singleflight.Group
+	imageFilesCache  sync.Map
+	imageFilesFlight singleflight.Group
+}
+
+type componentCacheKey struct{}
+
+// WithComponentCache returns a new context with a fresh component-scoped cache.
+// Use this to scope blob and image files caches to a single component evaluation.
+// When the context goes out of scope, the cached data becomes eligible for GC.
+func WithComponentCache(ctx context.Context) context.Context {
+	return context.WithValue(ctx, componentCacheKey{}, &ComponentCache{})
+}
+
+// componentCacheFromContext returns the ComponentCache from the context,
+// falling back to the global default if none is set.
+func componentCacheFromContext(ctx context.Context) *ComponentCache {
+	if cc, ok := ctx.Value(componentCacheKey{}).(*ComponentCache); ok && cc != nil {
+		return cc
+	}
+	return defaultComponentCache
 }
 
 func ociImageManifestsBatch(bctx rego.BuiltinContext, a *ast.Term) (*ast.Term, error) {
@@ -823,16 +866,20 @@ func ociImageFiles(bctx rego.BuiltinContext, refTerm *ast.Term, pathsTerm *ast.T
 	pathsHash := fmt.Sprintf("%x", sha256.Sum256([]byte(pathsTerm.String())))[:12]
 	cacheKey := refStr + ":" + pathsHash
 
+	// Use component-scoped cache if available, otherwise fall back to global.
+	// Image files data can be substantial and is unique per component.
+	cc := componentCacheFromContext(bctx.Context)
+
 	// Check cache first (fast path)
-	if cached, found := imageFilesCache.Load(cacheKey); found {
+	if cached, found := cc.imageFilesCache.Load(cacheKey); found {
 		logger.Debug("Image files served from cache")
 		return cached.(*ast.Term), nil
 	}
 
 	// Use singleflight to prevent thundering herd
-	result, err, _ := imageFilesFlight.Do(cacheKey, func() (any, error) {
+	result, err, _ := cc.imageFilesFlight.Do(cacheKey, func() (any, error) {
 		// Double-check cache inside singleflight
-		if cached, found := imageFilesCache.Load(cacheKey); found {
+		if cached, found := cc.imageFilesCache.Load(cacheKey); found {
 			logger.Debug("Image files served from cache (after singleflight)")
 			return cached, nil
 		}
@@ -893,7 +940,7 @@ func ociImageFiles(bctx rego.BuiltinContext, refTerm *ast.Term, pathsTerm *ast.T
 
 		logger.Debug("Successfully extracted image files")
 		term := ast.NewTerm(filesValue)
-		imageFilesCache.Store(cacheKey, term)
+		cc.imageFilesCache.Store(cacheKey, term)
 		return term, nil
 	})
 
