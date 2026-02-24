@@ -151,6 +151,7 @@ mark (?) sign, for example: --output text=output.txt?show-successes=false
   * inline JSON ('{sources: {...}, identity: {...}}')")
 -k, --public-key:: path to the public key. Overrides publicKey from EnterpriseContractPolicy
 -r, --rekor-url:: Rekor URL. Overrides rekorURL from EnterpriseContractPolicy
+--skip-image-sig-check:: Skip image signature validation checks. (Default: false)
 --snapshot:: Provide the AppStudio Snapshot as a source of the images to validate, as inline
 JSON of the "spec" or a reference to a Kubernetes object [<namespace>/]<name>
 -s, --strict:: Return non-zero status on non-successful validation. Defaults to true. Use --strict=false to return a zero status code. (Default: true)

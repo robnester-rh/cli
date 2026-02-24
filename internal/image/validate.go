@@ -74,7 +74,12 @@ func ValidateImage(ctx context.Context, comp app.SnapshotComponent, snap *app.Sn
 		log.Debugf("Unable to fetch image manifests: %s", err)
 	}
 
-	out.SetImageSignatureCheckFromError(a.ValidateImageSignature(ctx))
+	// Handle image signature validation
+	if p.SkipImageSigCheck() {
+		log.Debug("Image signature check skipped")
+	} else {
+		out.SetImageSignatureCheckFromError(a.ValidateImageSignature(ctx))
+	}
 
 	out.SetAttestationSignatureCheckFromError(a.ValidateAttestationSignature(ctx))
 	if !out.AttestationSignatureCheck.Passed {
