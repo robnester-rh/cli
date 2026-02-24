@@ -34,6 +34,7 @@ import (
 	"github.com/sigstore/cosign/v3/pkg/cosign"
 	"github.com/sigstore/cosign/v3/pkg/oci"
 	"github.com/sigstore/sigstore/pkg/tuf"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/conforma/cli/internal/attestation"
 	"github.com/conforma/cli/internal/policy"
@@ -109,29 +110,37 @@ func registerSigstoreVerifyImage() {
 }
 
 func sigstoreVerifyImage(bctx rego.BuiltinContext, refTerm *ast.Term, optsTerm *ast.Term) (*ast.Term, error) {
+	logger := log.WithField("function", sigstoreVerifyImageName)
 	ctx := bctx.Context
 
 	uri, err := builtins.StringOperand(refTerm.Value, 0)
 	if err != nil {
+		logger.WithField("error", err).Debug("failed to get ref parameter")
 		return signatureFailedResult(fmt.Errorf("ref parameter: %w", err))
 	}
+	logger = logger.WithField("ref", string(uri))
 
 	ref, err := name.NewDigest(string(uri))
 	if err != nil {
+		logger.WithField("error", err).Debug("failed to create new digest")
 		return signatureFailedResult(fmt.Errorf("new digest: %w", err))
 	}
 
 	checkOpts, err := parseCheckOpts(ctx, optsTerm)
 	if err != nil {
+		logger.WithField("error", err).Debug("failed to parse check opts")
 		return signatureFailedResult(fmt.Errorf("opts parameter: %w", err))
 	}
 	checkOpts.ClaimVerifier = cosign.SimpleClaimVerifier
 
+	logger.Debug("verifying image signatures")
 	signatures, _, err := ecoci.NewClient(ctx).VerifyImageSignatures(ref, checkOpts)
 	if err != nil {
+		logger.WithField("error", err).Debug("failed to verify image signature")
 		return signatureFailedResult(fmt.Errorf("verify image signature: %w", err))
 	}
 
+	logger.WithField("signatures_count", len(signatures)).Debug("image signature verification complete")
 	return signatureResult(signatures, nil)
 }
 
@@ -170,29 +179,37 @@ func registerSigstoreVerifyAttestation() {
 }
 
 func sigstoreVerifyAttestation(bctx rego.BuiltinContext, refTerm *ast.Term, optsTerm *ast.Term) (*ast.Term, error) {
+	logger := log.WithField("function", sigstoreVerifyAttestationName)
 	ctx := bctx.Context
 
 	uri, err := builtins.StringOperand(refTerm.Value, 0)
 	if err != nil {
+		logger.WithField("error", err).Debug("failed to get ref parameter")
 		return attestationFailedResult(fmt.Errorf("ref parameter: %w", err))
 	}
+	logger = logger.WithField("ref", string(uri))
 
 	ref, err := name.NewDigest(string(uri))
 	if err != nil {
+		logger.WithField("error", err).Debug("failed to create new digest")
 		return attestationFailedResult(fmt.Errorf("new digest: %w", err))
 	}
 
 	checkOpts, err := parseCheckOpts(ctx, optsTerm)
 	if err != nil {
+		logger.WithField("error", err).Debug("failed to parse check opts")
 		return attestationFailedResult(fmt.Errorf("opts parameter: %w", err))
 	}
 	checkOpts.ClaimVerifier = cosign.IntotoSubjectClaimVerifier
 
+	logger.Debug("verifying image attestations")
 	attestations, _, err := ecoci.NewClient(ctx).VerifyImageAttestations(ref, checkOpts)
 	if err != nil {
+		logger.WithField("error", err).Debug("failed to verify image attestation signature")
 		return attestationFailedResult(fmt.Errorf("verify image attestation signature: %w", err))
 	}
 
+	logger.WithField("attestations_count", len(attestations)).Debug("attestation verification complete")
 	return attestationResult(attestations, nil)
 }
 

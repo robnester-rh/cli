@@ -108,29 +108,41 @@ func registerPURLParse() {
 }
 
 func purlIsValid(bctx rego.BuiltinContext, a *ast.Term) (*ast.Term, error) {
+	logger := log.WithField("function", purlIsValidName)
+
 	uri, ok := a.Value.(ast.String)
 	if !ok {
+		logger.Debug("input is not a string")
 		return ast.BooleanTerm(false), nil
 	}
+	logger = logger.WithField("purl", string(uri))
+
 	_, err := packageurl.FromString(string(uri))
 	if err != nil {
-		log.Debugf("Parsing PURL %s failed: %s", uri, err)
+		logger.WithField("error", err).Debug("failed to parse PURL")
 		return ast.BooleanTerm(false), nil
 	}
+	logger.Debug("PURL is valid")
 	return ast.BooleanTerm(true), nil
 }
 
 func purlParse(bctx rego.BuiltinContext, a *ast.Term) (*ast.Term, error) {
+	logger := log.WithField("function", purlParseName)
+
 	uri, ok := a.Value.(ast.String)
 	if !ok {
+		logger.Debug("input is not a string")
 		return nil, nil
 	}
+	logger = logger.WithField("purl", string(uri))
+
 	instance, err := packageurl.FromString(string(uri))
 	if err != nil {
-		log.Errorf("Parsing PURL %s failed: %s", uri, err)
+		logger.WithField("error", err).Error("failed to parse PURL")
 		return nil, nil
 	}
 
+	logger.Debug("successfully parsed PURL")
 	qualifiers := ast.NewArray()
 	for _, q := range instance.Qualifiers {
 		o := ast.NewObject(
