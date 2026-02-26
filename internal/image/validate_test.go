@@ -37,6 +37,7 @@ import (
 	v02 "github.com/in-toto/in-toto-golang/in_toto/slsa_provenance/v0.2"
 	app "github.com/konflux-ci/application-api/api/v1alpha1"
 	ssldsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
+	"github.com/sigstore/cosign/v3/pkg/cosign"
 	"github.com/sigstore/cosign/v3/pkg/oci"
 	"github.com/sigstore/cosign/v3/pkg/oci/static"
 	cosignTypes "github.com/sigstore/cosign/v3/pkg/types"
@@ -562,6 +563,142 @@ func TestValidateImageWithVSACheck_FlagCombinations(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, output)
 			}
+		})
+	}
+}
+
+func TestValidateImageSkipImageSigCheck(t *testing.T) {
+	tests := []struct {
+		name                    string
+		skipImageSigCheck       bool
+		expectImageSigCheckCall bool
+		expectImageSigResult    bool
+		expectAttSigCheckCall   bool
+	}{
+		{
+			name:                    "skip image signature check disabled (default)",
+			skipImageSigCheck:       false,
+			expectImageSigCheckCall: true,
+			expectImageSigResult:    true,
+			expectAttSigCheckCall:   true,
+		},
+		{
+			name:                    "skip image signature check enabled",
+			skipImageSigCheck:       true,
+			expectImageSigCheckCall: false,
+			expectImageSigResult:    false,
+			expectAttSigCheckCall:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+			ctx := utils.WithFS(context.Background(), fs)
+
+			// Create a test component with a valid SHA256 digest
+			comp := app.SnapshotComponent{
+				ContainerImage: imageRef, // Use the existing imageRef constant
+			}
+
+			// Set up mock image infrastructure like other tests
+			ctx = withImageConfig(ctx, comp.ContainerImage)
+			client := ecoci.NewClient(ctx)
+			fakeClient := client.(*fake.FakeClient)
+
+			// Set up minimal fake data for image to pass accessibility check
+			// and signature/attestation checks (they will fail but create results)
+			fakeClient.On("Head", ref).Return(&v1.Descriptor{MediaType: types.OCIManifestSchema1}, nil)
+			fakeClient.On("VerifyImageSignatures", refNoTag, mock.Anything).Return([]oci.Signature{}, false, fmt.Errorf("no signatures found"))
+			fakeClient.On("VerifyImageAttestations", refNoTag, mock.Anything).Return([]oci.Signature{}, false, fmt.Errorf("no attestations found"))
+
+			// Create policy options to set SkipImageSigCheck
+			opts := policy.Options{
+				EffectiveTime:     policy.Now,
+				SkipImageSigCheck: tt.skipImageSigCheck,
+				Identity: cosign.Identity{
+					Issuer:  "https://example.com/oidc",
+					Subject: "test@example.com",
+				},
+			}
+
+			// Apply the options to create the policy
+			updatedPolicy, _, err := policy.PreProcessPolicy(ctx, opts)
+			require.NoError(t, err)
+
+			// Create a mock snapshot spec
+			snap := &app.SnapshotSpec{}
+
+			// Create empty evaluators slice
+			evaluators := []evaluator.Evaluator{}
+
+			// Call ValidateImage
+			output, err := ValidateImage(ctx, comp, snap, updatedPolicy, evaluators, false)
+
+			// Validation should complete without error
+			require.NoError(t, err)
+			require.NotNil(t, output)
+
+			// Check if ImageSignatureCheck result was set based on expectations
+			if tt.expectImageSigResult {
+				// When image signature check is NOT skipped, it should have a result
+				assert.NotNil(t, output.ImageSignatureCheck.Result, "Expected ImageSignatureCheck to have a result")
+			} else {
+				// When image signature check IS skipped, it should not have a result
+				assert.Nil(t, output.ImageSignatureCheck.Result, "Expected ImageSignatureCheck to not have a result when skipped")
+			}
+
+			// AttestationSignatureCheck should always have a result (not affected by the flag)
+			assert.NotNil(t, output.AttestationSignatureCheck.Result, "AttestationSignatureCheck should always have a result")
+
+			// Verify that skipped checks don't appear in violations or successes
+			violations := output.Violations()
+			successes := output.Successes()
+
+			if tt.skipImageSigCheck {
+				// When skipped, image signature check should not appear in violations or successes
+				for _, violation := range violations {
+					if violation.Metadata != nil {
+						code, ok := violation.Metadata["code"].(string)
+						if ok {
+							assert.NotEqual(t, "builtin.image.signature_check", code,
+								"Skipped image signature check should not appear in violations")
+						}
+					}
+				}
+
+				for _, success := range successes {
+					if success.Metadata != nil {
+						code, ok := success.Metadata["code"].(string)
+						if ok {
+							assert.NotEqual(t, "builtin.image.signature_check", code,
+								"Skipped image signature check should not appear in successes")
+						}
+					}
+				}
+			}
+
+			// Attestation signature check should always appear in results (when it has a result)
+			foundAttestationCheck := false
+			for _, violation := range violations {
+				if violation.Metadata != nil {
+					code, ok := violation.Metadata["code"].(string)
+					if ok && code == "builtin.attestation.signature_check" {
+						foundAttestationCheck = true
+						break
+					}
+				}
+			}
+			for _, success := range successes {
+				if success.Metadata != nil {
+					code, ok := success.Metadata["code"].(string)
+					if ok && code == "builtin.attestation.signature_check" {
+						foundAttestationCheck = true
+						break
+					}
+				}
+			}
+			assert.True(t, foundAttestationCheck, "AttestationSignatureCheck should appear in results")
 		})
 	}
 }

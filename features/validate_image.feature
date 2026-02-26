@@ -31,6 +31,31 @@ Feature: evaluate enterprise contract
     Then the exit status should be 0
     Then the output should match the snapshot
 
+  Scenario: happy day with skip-image-sig-check flag
+    Given a key pair named "known"
+    Given an image named "acceptance/ec-happy-day"
+    Given a valid image signature of "acceptance/ec-happy-day" image signed by the "known" key
+    Given a valid attestation of "acceptance/ec-happy-day" signed by the "known" key
+    Given a git repository named "happy-day-policy" with
+      | main.rego | examples/happy_day.rego |
+    Given policy configuration named "ec-policy" with specification
+    """
+    {
+      "sources": [
+        {
+          "policy": [
+            "git::https://${GITHOST}/git/happy-day-policy.git"
+          ]
+        }
+      ]
+    }
+    """
+    When ec command is run with "validate image --image ${REGISTRY}/acceptance/ec-happy-day --policy acceptance/ec-policy --public-key ${known_PUBLIC_KEY} --skip-image-sig-check --rekor-url ${REKOR} --show-successes --output json"
+    Then the exit status should be 0
+    # The only difference to the previous scenario is that
+    # builtin.attestation.image_check is not found in the success output
+    Then the output should match the snapshot
+
   Scenario: happy day with git config and yaml
     Given a key pair named "known"
     Given an image named "acceptance/ec-happy-day"
@@ -159,6 +184,36 @@ Feature: evaluate enterprise contract
     """
     When ec command is run with "validate image --image ${REGISTRY}/acceptance/invalid-image-signature --policy acceptance/invalid-image-signature-policy --public-key ${unknown_PUBLIC_KEY} --rekor-url ${REKOR} --show-successes --output json"
     Then the exit status should be 1
+    Then the output should match the snapshot
+
+  Scenario: invalid image signature with valid att sig and skip-image-sig-check flag
+    Given a key pair named "known"
+    Given a key pair named "unknown"
+    Given an image named "acceptance/invalid-image-signature"
+
+    # We're going to use the "unknown" public key when validating, so the image
+    # sig check should fail (if it wasn't skipped) but the att sig check should pass.
+    Given a valid image signature of "acceptance/invalid-image-signature" image signed by the "known" key
+    Given a valid attestation of "acceptance/invalid-image-signature" signed by the "unknown" key
+
+    Given a git repository named "invalid-image-signature" with
+      | main.rego | examples/happy_day.rego |
+    Given policy configuration named "invalid-image-signature-policy" with specification
+    """
+    {
+      "sources": [
+        {
+          "policy": [
+            "git::https://${GITHOST}/git/invalid-image-signature.git"
+          ]
+        }
+      ]
+    }
+    """
+    # Notice we're using the --skip-image-sig-check flag, which is the reason this is
+    # green even though image is signed with a different key to the one we're providing
+    When ec command is run with "validate image --image ${REGISTRY}/acceptance/invalid-image-signature --policy acceptance/invalid-image-signature-policy --public-key ${unknown_PUBLIC_KEY} --skip-image-sig-check --rekor-url ${REKOR} --show-successes --output json"
+    Then the exit status should be 0
     Then the output should match the snapshot
 
   Scenario: unexpected image signature cert

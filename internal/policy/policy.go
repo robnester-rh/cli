@@ -74,6 +74,7 @@ type Policy interface {
 	WithSpec(spec ecc.EnterpriseContractPolicySpec) Policy
 	Spec() ecc.EnterpriseContractPolicySpec
 	EffectiveTime() time.Time
+	SkipImageSigCheck() bool
 	AttestationTime(time.Time)
 	Identity() cosign.Identity
 	Keyless() bool
@@ -82,12 +83,13 @@ type Policy interface {
 
 type policy struct {
 	ecc.EnterpriseContractPolicySpec
-	checkOpts       *cosign.CheckOpts
-	choosenTime     string
-	effectiveTime   *time.Time
-	attestationTime *time.Time
-	identity        cosign.Identity
-	ignoreRekor     bool
+	checkOpts         *cosign.CheckOpts
+	choosenTime       string
+	effectiveTime     *time.Time
+	attestationTime   *time.Time
+	identity          cosign.Identity
+	ignoreRekor       bool
+	skipImageSigCheck bool
 }
 
 // PublicKeyPEM returns the PublicKey in PEM format.
@@ -146,12 +148,13 @@ func (p *policy) SigstoreOpts() (SigstoreOpts, error) {
 }
 
 type Options struct {
-	EffectiveTime string
-	Identity      cosign.Identity
-	IgnoreRekor   bool
-	PolicyRef     string
-	PublicKey     string
-	RekorURL      string
+	EffectiveTime     string
+	Identity          cosign.Identity
+	IgnoreRekor       bool
+	SkipImageSigCheck bool
+	PolicyRef         string
+	PublicKey         string
+	RekorURL          string
 }
 
 // NewOfflinePolicy construct and return a new instance of Policy that is used
@@ -240,6 +243,7 @@ func NewPolicy(ctx context.Context, opts Options) (Policy, error) {
 	}
 
 	p.ignoreRekor = opts.IgnoreRekor
+	p.skipImageSigCheck = opts.SkipImageSigCheck
 
 	if opts.PublicKey != "" && opts.PublicKey != p.PublicKey {
 		p.PublicKey = opts.PublicKey
@@ -372,6 +376,10 @@ func (p policy) EffectiveTime() time.Time {
 	}
 
 	return *p.effectiveTime
+}
+
+func (p policy) SkipImageSigCheck() bool {
+	return p.skipImageSigCheck
 }
 
 func isNow(choosenTime string) bool {

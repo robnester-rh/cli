@@ -209,10 +209,11 @@ func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 					Subject:       data.certificateIdentity,
 					SubjectRegExp: data.certificateIdentityRegExp,
 				},
-				IgnoreRekor: data.ignoreRekor,
-				PolicyRef:   data.policyConfiguration,
-				PublicKey:   data.publicKey,
-				RekorURL:    data.rekorURL,
+				IgnoreRekor:       data.ignoreRekor,
+				SkipImageSigCheck: data.skipImageSigCheck,
+				PolicyRef:         data.policyConfiguration,
+				PublicKey:         data.publicKey,
+				RekorURL:          data.rekorURL,
 			}
 
 			// We're not currently using the policyCache returned from PreProcessPolicy, but we could
@@ -492,6 +493,9 @@ func validateImageCmd(validate imageValidationFunc) *cobra.Command {
 	cmd.Flags().BoolVar(&data.ignoreRekor, "ignore-rekor", data.ignoreRekor,
 		"Skip Rekor transparency log checks during validation.")
 
+	cmd.Flags().BoolVar(&data.skipImageSigCheck, "skip-image-sig-check", data.skipImageSigCheck,
+		"Skip image signature validation checks.")
+
 	cmd.Flags().StringVar(&data.certificateIdentity, "certificate-identity", data.certificateIdentity,
 		"URL of the certificate identity for keyless verification")
 
@@ -629,6 +633,7 @@ type imageData struct {
 	info                        bool
 	input                       string
 	ignoreRekor                 bool
+	skipImageSigCheck           bool
 	output                      []string
 	outputFile                  string
 	policy                      policy.Policy
