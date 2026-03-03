@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/cache"
@@ -109,47 +108,15 @@ func (s *safeCache) Delete(h v1.Hash) error {
 }
 
 // safeLayer wraps a layer that may write to the cache on first read.
-// The first caller of Compressed() or Uncompressed() gets a streaming reader;
-// the inner layer writes to the cache as data is read. When that reader is
-// closed (after draining any remainder), concurrent callers are unblocked and
-// read from the cached file. This preserves streaming and avoids full
-// materialization before returning.
+// Compressed() and Uncompressed() use digest-scoped singleflight so only one
+// goroutine runs the inner stream per digest (across all safeLayer instances,
+// e.g. from concurrent Get(digest) callers). Waiters block until the cache file
+// is ready, then open it—no dependency on the first caller closing a reader,
+// avoiding deadlock and cross-instance races.
 type safeLayer struct {
 	inner  v1.Layer
 	path   string
 	flight *singleflight.Group
-
-	// compressed: first caller streams; others wait on ready then open path.
-	compressedMu    sync.Mutex
-	compressedReady chan struct{} // closed when first caller's stream is done
-	compressedErr   error         // set if streaming failed so waiters can return it
-
-	uncompressedMu    sync.Mutex
-	uncompressedReady chan struct{}
-	uncompressedErr   error
-}
-
-// streamingCloseReader wraps a ReadCloser and drains then closes it, then
-// signals ready so waiters can open the cache file.
-type streamingCloseReader struct {
-	rc    io.ReadCloser
-	ready chan struct{}
-	once  sync.Once
-}
-
-func (s *streamingCloseReader) Read(p []byte) (n int, err error) {
-	return s.rc.Read(p)
-}
-
-func (s *streamingCloseReader) Close() error {
-	var err error
-	s.once.Do(func() {
-		// Drain remainder so inner cache file is complete before signaling.
-		_, _ = io.Copy(io.Discard, s.rc)
-		err = s.rc.Close()
-		close(s.ready)
-	})
-	return err
 }
 
 func (l *safeLayer) Digest() (v1.Hash, error)            { return l.inner.Digest() }
@@ -163,37 +130,28 @@ func (l *safeLayer) Compressed() (io.ReadCloser, error) {
 		return nil, err
 	}
 	path := cachePath(l.path, digest)
-
-	l.compressedMu.Lock()
 	if _, err := os.Stat(path); err == nil {
-		l.compressedMu.Unlock()
 		return os.Open(path)
 	}
-	if l.compressedReady != nil {
-		ready := l.compressedReady
-		l.compressedMu.Unlock()
-		<-ready
-		l.compressedMu.Lock()
-		if l.compressedErr != nil {
-			err := l.compressedErr
-			l.compressedMu.Unlock()
+	key := "compressed:" + digest.String()
+	v, err, _ := l.flight.Do(key, func() (any, error) {
+		rc, err := l.inner.Compressed()
+		if err != nil {
 			return nil, err
 		}
-		l.compressedMu.Unlock()
-		return os.Open(path)
-	}
-	l.compressedReady = make(chan struct{})
-	l.compressedMu.Unlock()
-
-	rc, err := l.inner.Compressed()
+		ready := make(chan struct{})
+		go func() {
+			_, _ = io.Copy(io.Discard, rc)
+			_ = rc.Close()
+			close(ready)
+		}()
+		return ready, nil
+	})
 	if err != nil {
-		l.compressedMu.Lock()
-		l.compressedErr = err
-		close(l.compressedReady)
-		l.compressedMu.Unlock()
 		return nil, err
 	}
-	return &streamingCloseReader{rc: rc, ready: l.compressedReady}, nil
+	<-v.(chan struct{})
+	return os.Open(path)
 }
 
 func (l *safeLayer) Uncompressed() (io.ReadCloser, error) {
@@ -202,35 +160,26 @@ func (l *safeLayer) Uncompressed() (io.ReadCloser, error) {
 		return nil, err
 	}
 	path := cachePath(l.path, diffID)
-
-	l.uncompressedMu.Lock()
 	if _, err := os.Stat(path); err == nil {
-		l.uncompressedMu.Unlock()
 		return os.Open(path)
 	}
-	if l.uncompressedReady != nil {
-		ready := l.uncompressedReady
-		l.uncompressedMu.Unlock()
-		<-ready
-		l.uncompressedMu.Lock()
-		if l.uncompressedErr != nil {
-			err := l.uncompressedErr
-			l.uncompressedMu.Unlock()
+	key := "uncompressed:" + diffID.String()
+	v, err, _ := l.flight.Do(key, func() (any, error) {
+		rc, err := l.inner.Uncompressed()
+		if err != nil {
 			return nil, err
 		}
-		l.uncompressedMu.Unlock()
-		return os.Open(path)
-	}
-	l.uncompressedReady = make(chan struct{})
-	l.uncompressedMu.Unlock()
-
-	rc, err := l.inner.Uncompressed()
+		ready := make(chan struct{})
+		go func() {
+			_, _ = io.Copy(io.Discard, rc)
+			_ = rc.Close()
+			close(ready)
+		}()
+		return ready, nil
+	})
 	if err != nil {
-		l.uncompressedMu.Lock()
-		l.uncompressedErr = err
-		close(l.uncompressedReady)
-		l.uncompressedMu.Unlock()
 		return nil, err
 	}
-	return &streamingCloseReader{rc: rc, ready: l.uncompressedReady}, nil
+	<-v.(chan struct{})
+	return os.Open(path)
 }

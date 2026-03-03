@@ -686,6 +686,7 @@ Feature: evaluate enterprise contract
 
   # Ensures the image layer cache is safe under concurrent use when validating multiple
   # components that share the same image (same layers). See https://github.com/conforma/cli/issues/1109.
+  # Step uses same JSON-in-quotes pattern as "json-input single component" scenario (line ~649).
   Scenario: parallel validation with cache and shared image layers
     Given a key pair named "known"
     Given an image named "acceptance/ec-happy-day"
