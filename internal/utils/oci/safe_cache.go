@@ -126,10 +126,10 @@ func (l *safeLayer) MediaType() (types.MediaType, error) { return l.inner.MediaT
 
 // Compressed returns a reader for the layer's compressed bytes. If the layer is
 // already cached on disk (by digest), it opens and returns that file. Otherwise
-// it uses singleflight so only one goroutine calls the inner Compressed() and
-// drains the stream (allowing the inner cache to write the file); all callers
-// then wait for the file to be ready and open it. This avoids races when
-// multiple goroutines request the same layer.
+// it uses singleflight so only one goroutine calls the inner Compressed(),
+// drains the stream synchronously (allowing the inner cache to write the file),
+// and returns only after the file is written; all callers then open the file.
+// Errors from the drain or Close are propagated.
 func (l *safeLayer) Compressed() (io.ReadCloser, error) {
 	digest, err := l.inner.Digest()
 	if err != nil {
@@ -141,25 +141,24 @@ func (l *safeLayer) Compressed() (io.ReadCloser, error) {
 	}
 	// Only one goroutine runs the inner work; others block on the same key.
 	key := "compressed:" + digest.String()
-	v, err, _ := l.flight.Do(key, func() (any, error) {
+	_, err, _ = l.flight.Do(key, func() (any, error) {
 		rc, err := l.inner.Compressed()
 		if err != nil {
 			return nil, err
 		}
-		// Drain the stream in a goroutine so the inner cache can write the file.
-		// We signal when done so callers can open the file instead of the stream.
-		ready := make(chan struct{})
-		go func() {
-			_, _ = io.Copy(io.Discard, rc)
+		// Drain synchronously so the inner cache writes the file before we return.
+		if _, err := io.Copy(io.Discard, rc); err != nil {
 			_ = rc.Close()
-			close(ready)
-		}()
-		return ready, nil
+			return nil, err
+		}
+		if err := rc.Close(); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	<-v.(chan struct{})
 	return os.Open(path)
 }
 
@@ -177,23 +176,23 @@ func (l *safeLayer) Uncompressed() (io.ReadCloser, error) {
 	}
 	// Only one goroutine runs the inner work; others block on the same key.
 	key := "uncompressed:" + diffID.String()
-	v, err, _ := l.flight.Do(key, func() (any, error) {
+	_, err, _ = l.flight.Do(key, func() (any, error) {
 		rc, err := l.inner.Uncompressed()
 		if err != nil {
 			return nil, err
 		}
-		// Drain the stream in a goroutine so the inner cache can write the file.
-		ready := make(chan struct{})
-		go func() {
-			_, _ = io.Copy(io.Discard, rc)
+		// Drain synchronously so the inner cache writes the file before we return.
+		if _, err := io.Copy(io.Discard, rc); err != nil {
 			_ = rc.Close()
-			close(ready)
-		}()
-		return ready, nil
+			return nil, err
+		}
+		if err := rc.Close(); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	<-v.(chan struct{})
 	return os.Open(path)
 }
